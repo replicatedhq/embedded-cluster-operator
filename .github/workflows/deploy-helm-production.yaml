@@ -23,8 +23,8 @@ jobs:
     - name: Run Package and Publish
       working-directory: charts/embedded-cluster-operator
       env: 
-        HELM_USER: ${{secrets.HELM_USER_PROD}}
-        HELM_PASS: ${{secrets.HELM_PASS_PROD}}
+        HELM_USER: ${{secrets.KOTS_HELM_USER_PROD}}
+        HELM_PASS: ${{secrets.KOTS_HELM_PASS_PROD}}
         CHART_VERSION: ${{steps.tag.outputs.tag}}
       run: |
         envsubst < Chart.yaml.tmpl > Chart.yaml

@@ -40,17 +40,11 @@ spec:
                   to configure the cluster.
                 properties:
                   k0s:
-                    description: K0sUnsupportedOverrides holds the overrides used
-                      to configure k0s. These overrides are merged on top of the default
-                      k0s configuraiton. As the struct inside this configuration is
-                      very dynamic we have chosen to use a string here. Inside Config
-                      we store yaml.
-                    properties:
-                      config:
-                        type: string
-                    type: object
-                required:
-                - k0s
+                    description: K0s holds the overrides used to configure k0s. These
+                      overrides are merged on top of the default k0s configuration.
+                      As the data layout inside this configuration is very dynamic
+                      we have chosen to use a string here.
+                    type: string
                 type: object
             type: object
           status:

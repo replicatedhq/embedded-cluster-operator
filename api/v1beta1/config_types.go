@@ -20,18 +20,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// K0sUnsupportedOverrides holds the overrides used to configure k0s.
-// These overrides are merged on top of the default k0s configuraiton.
-// As the struct inside this configuration is very dynamic we have
-// chosen to use a string here. Inside Config we store yaml.
-type K0sUnsupportedOverrides struct {
-	Config string `json:"config,omitempty"`
-}
-
 // UnsupportedOverrides holds the config overrides used to configure
 // the cluster.
 type UnsupportedOverrides struct {
-	K0s K0sUnsupportedOverrides `json:"k0s"`
+	// K0s holds the overrides used to configure k0s. These overrides
+	// are merged on top of the default k0s configuration. As the data
+	// layout inside this configuration is very dynamic we have chosen
+	// to use a string here.
+	K0s string `json:"k0s,omitempty"`
 }
 
 // ConfigSpec defines the desired state of Config

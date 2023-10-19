@@ -11,5 +11,5 @@ roleRef:
   name: embedded-cluster-operator
 subjects:
 - kind: ServiceAccount
-  name: embedded-cluster-operator
+  name: {{ include "embedded-cluster-operator.serviceAccountName" $ | trunc 63 | trimAll "-"}}
   namespace: {{ .Release.Namespace }}

@@ -39,16 +39,18 @@ type NodeCount struct {
 
 // CustomNodeRole is the role of a node in the cluster.
 type CustomNodeRole struct {
-	Name        string     `json:"name,omitempty"`
-	Description string     `json:"description,omitempty"`
-	NodeCount   *NodeCount `json:"nodeCount,omitempty"`
+	Name        string            `json:"name,omitempty"`
+	Description string            `json:"description,omitempty"`
+	NodeCount   *NodeCount        `json:"nodeCount,omitempty"`
+	Labels      map[string]string `json:"labels,omitempty"`
 }
 
 // ControlPlaneRole holds the configuration for the control plane.
 type ControlPlaneRole struct {
-	Alias       string     `json:"alias,omitempty"`
-	Description string     `json:"description,omitempty"`
-	NodeCount   *NodeCount `json:"nodeCount,omitempty"`
+	Alias       string            `json:"alias,omitempty"`
+	Description string            `json:"description,omitempty"`
+	NodeCount   *NodeCount        `json:"nodeCount,omitempty"`
+	Labels      map[string]string `json:"labels,omitempty"`
 }
 
 // ConfigSpec defines the desired state of Config

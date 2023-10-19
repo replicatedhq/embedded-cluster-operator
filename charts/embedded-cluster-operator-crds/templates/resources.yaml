@@ -37,6 +37,10 @@ spec:
                     type: string
                   description:
                     type: string
+                  labels:
+                    additionalProperties:
+                      type: string
+                    type: object
                   nodeCount:
                     description: NodeCount holds a series of rules for a given node role.
                     properties:
@@ -58,6 +62,10 @@ spec:
                   properties:
                     description:
                       type: string
+                    labels:
+                      additionalProperties:
+                        type: string
+                      type: object
                     name:
                       type: string
                     nodeCount:

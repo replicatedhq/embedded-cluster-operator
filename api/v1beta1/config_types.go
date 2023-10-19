@@ -30,11 +30,19 @@ type UnsupportedOverrides struct {
 	K0s string `json:"k0s,omitempty"`
 }
 
+// NodeRange contains a min and max or only one of them.
+type NodeRange struct {
+	// Min is the minimum number of nodes.
+	Min *int `json:"min,omitempty"`
+	// Max is the maximum number of nodes.
+	Max *int `json:"max,omitempty"`
+}
+
 // NodeCount holds a series of rules for a given node role.
 type NodeCount struct {
-	Variable []int `json:"variable,omitempty"`
-	Exact    *int  `json:"exact,omitempty"`
-	Range    []int `json:"range,omitempty"`
+	// Variable holds a list of allowed node counts.
+	Variable []int      `json:"variable,omitempty"`
+	Range    *NodeRange `json:"range,omitempty"`
 }
 
 // NodeRole is the role of a node in the cluster.

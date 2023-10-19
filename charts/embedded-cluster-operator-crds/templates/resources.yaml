@@ -44,13 +44,18 @@ spec:
                   nodeCount:
                     description: NodeCount holds a series of rules for a given node role.
                     properties:
-                      exact:
-                        type: integer
                       range:
-                        items:
-                          type: integer
-                        type: array
+                        description: NodeRange contains a min and max or only one of them.
+                        properties:
+                          max:
+                            description: Max is the maximum number of nodes.
+                            type: integer
+                          min:
+                            description: Min is the minimum number of nodes.
+                            type: integer
+                        type: object
                       variable:
+                        description: Variable holds a list of allowed node counts.
                         items:
                           type: integer
                         type: array
@@ -71,13 +76,18 @@ spec:
                     nodeCount:
                       description: NodeCount holds a series of rules for a given node role.
                       properties:
-                        exact:
-                          type: integer
                         range:
-                          items:
-                            type: integer
-                          type: array
+                          description: NodeRange contains a min and max or only one of them.
+                          properties:
+                            max:
+                              description: Max is the maximum number of nodes.
+                              type: integer
+                            min:
+                              description: Min is the minimum number of nodes.
+                              type: integer
+                          type: object
                         variable:
+                          description: Variable holds a list of allowed node counts.
                           items:
                             type: integer
                           type: array
@@ -167,13 +177,18 @@ spec:
                           nodeCount:
                             description: NodeCount holds a series of rules for a given node role.
                             properties:
-                              exact:
-                                type: integer
                               range:
-                                items:
-                                  type: integer
-                                type: array
+                                description: NodeRange contains a min and max or only one of them.
+                                properties:
+                                  max:
+                                    description: Max is the maximum number of nodes.
+                                    type: integer
+                                  min:
+                                    description: Min is the minimum number of nodes.
+                                    type: integer
+                                type: object
                               variable:
+                                description: Variable holds a list of allowed node counts.
                                 items:
                                   type: integer
                                 type: array
@@ -194,13 +209,18 @@ spec:
                             nodeCount:
                               description: NodeCount holds a series of rules for a given node role.
                               properties:
-                                exact:
-                                  type: integer
                                 range:
-                                  items:
-                                    type: integer
-                                  type: array
+                                  description: NodeRange contains a min and max or only one of them.
+                                  properties:
+                                    max:
+                                      description: Max is the maximum number of nodes.
+                                      type: integer
+                                    min:
+                                      description: Min is the minimum number of nodes.
+                                      type: integer
+                                  type: object
                                 variable:
+                                  description: Variable holds a list of allowed node counts.
                                   items:
                                     type: integer
                                   type: array

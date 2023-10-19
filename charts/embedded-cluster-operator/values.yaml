@@ -12,6 +12,8 @@ image:
   tag: v0.0.11
   pullPolicy: IfNotPresent
 
+kubeProxyImage: gcr.io/kubebuilder/kube-rbac-proxy:v0.13.1
+
 resources:
   limits:
     cpu: 500m

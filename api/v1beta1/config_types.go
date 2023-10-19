@@ -37,17 +37,9 @@ type NodeCount struct {
 	Range    []int `json:"range,omitempty"`
 }
 
-// CustomNodeRole is the role of a node in the cluster.
-type CustomNodeRole struct {
+// NodeRole is the role of a node in the cluster.
+type NodeRole struct {
 	Name        string            `json:"name,omitempty"`
-	Description string            `json:"description,omitempty"`
-	NodeCount   *NodeCount        `json:"nodeCount,omitempty"`
-	Labels      map[string]string `json:"labels,omitempty"`
-}
-
-// ControlPlaneRole holds the configuration for the control plane.
-type ControlPlaneRole struct {
-	Alias       string            `json:"alias,omitempty"`
 	Description string            `json:"description,omitempty"`
 	NodeCount   *NodeCount        `json:"nodeCount,omitempty"`
 	Labels      map[string]string `json:"labels,omitempty"`
@@ -55,8 +47,8 @@ type ControlPlaneRole struct {
 
 // ConfigSpec defines the desired state of Config
 type ConfigSpec struct {
-	ControlPlane         ControlPlaneRole     `json:"controlPlane,omitempty"`
-	Custom               []CustomNodeRole     `json:"custom,omitempty"`
+	ControlPlane         NodeRole             `json:"controlPlane,omitempty"`
+	Custom               []NodeRole           `json:"custom,omitempty"`
 	UnsupportedOverrides UnsupportedOverrides `json:"unsupportedOverrides,omitempty"`
 }
 

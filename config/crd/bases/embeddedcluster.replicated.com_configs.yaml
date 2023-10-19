@@ -36,17 +36,16 @@ spec:
             description: ConfigSpec defines the desired state of Config
             properties:
               controlPlane:
-                description: ControlPlaneRole holds the configuration for the control
-                  plane.
+                description: NodeRole is the role of a node in the cluster.
                 properties:
-                  alias:
-                    type: string
                   description:
                     type: string
                   labels:
                     additionalProperties:
                       type: string
                     type: object
+                  name:
+                    type: string
                   nodeCount:
                     description: NodeCount holds a series of rules for a given node
                       role.
@@ -65,7 +64,7 @@ spec:
                 type: object
               custom:
                 items:
-                  description: CustomNodeRole is the role of a node in the cluster.
+                  description: NodeRole is the role of a node in the cluster.
                   properties:
                     description:
                       type: string

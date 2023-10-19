@@ -54,7 +54,12 @@ jobs:
         HELM_PASS: ${{secrets.KOTS_HELM_PASS_PROD}}
         CHART_VERSION: ${{steps.tag.outputs.tag}}
       run: |
+        export OPERATOR_VERSION=${CHART_VERSION%-*}
+        export OPERATOR_TAG=v${OPERATOR_VERSION}
+        export OPERATOR_REGISTRY=registry.replicated.com
+
         envsubst < Chart.yaml.tmpl > Chart.yaml
+        envsubst < values.yaml.tmpl > values.yaml
         rm -f *.tmpl
 
         export CHART_NAME=`helm package . | rev | cut -d/ -f1 | rev`

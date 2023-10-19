@@ -54,8 +54,12 @@ jobs:
         HELM_PASS: ${{secrets.KOTS_HELM_PASS_STAGING}}
         CHART_VERSION: ${{steps.tag.outputs.tag}}
       run: |
+        export OPERATOR_VERSION=${CHART_VERSION%-*}
+        export OPERATOR_TAG=v${OPERATOR_VERSION}
+        export OPERATOR_REGISTRY=registry.staging.replicated.com
+
         envsubst < Chart.yaml.tmpl > Chart.yaml
-        rm -f *.tmpl
+        envsubst < values.yaml.tmpl > values.yaml
 
         export CHART_NAME=`helm package . | rev | cut -d/ -f1 | rev`
         echo pushing ${CHART_NAME} to staging

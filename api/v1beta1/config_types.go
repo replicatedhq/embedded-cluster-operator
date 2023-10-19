@@ -30,8 +30,31 @@ type UnsupportedOverrides struct {
 	K0s string `json:"k0s,omitempty"`
 }
 
+// NodeCount holds a series of rules for a given node role.
+type NodeCount struct {
+	Variable []int `json:"variable,omitempty"`
+	Exact    *int  `json:"exact,omitempty"`
+	Range    []int `json:"range,omitempty"`
+}
+
+// CustomNodeRole is the role of a node in the cluster.
+type CustomNodeRole struct {
+	Name        string     `json:"name,omitempty"`
+	Description string     `json:"description,omitempty"`
+	NodeCount   *NodeCount `json:"nodeCount,omitempty"`
+}
+
+// ControlPlaneRole holds the configuration for the control plane.
+type ControlPlaneRole struct {
+	Alias       string     `json:"alias,omitempty"`
+	Description string     `json:"description,omitempty"`
+	NodeCount   *NodeCount `json:"nodeCount,omitempty"`
+}
+
 // ConfigSpec defines the desired state of Config
 type ConfigSpec struct {
+	ControlPlane         ControlPlaneRole     `json:"controlPlane,omitempty"`
+	Custom               []CustomNodeRole     `json:"custom,omitempty"`
 	UnsupportedOverrides UnsupportedOverrides `json:"unsupportedOverrides,omitempty"`
 }
 

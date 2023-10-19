@@ -40,9 +40,11 @@ type NodeRange struct {
 
 // NodeCount holds a series of rules for a given node role.
 type NodeCount struct {
-	// Variable holds a list of allowed node counts.
-	Variable []int      `json:"variable,omitempty"`
-	Range    *NodeRange `json:"range,omitempty"`
+	// Values holds a list of allowed node counts.
+	Values []int `json:"values,omitempty"`
+	// NodeRange contains a min and max or only one of them (conflicts
+	// with Values).
+	Range *NodeRange `json:"range,omitempty"`
 }
 
 // NodeRole is the role of a node in the cluster.

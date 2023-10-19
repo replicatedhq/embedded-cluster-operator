@@ -52,7 +52,7 @@ spec:
                     properties:
                       range:
                         description: NodeRange contains a min and max or only one
-                          of them.
+                          of them (conflicts with Values).
                         properties:
                           max:
                             description: Max is the maximum number of nodes.
@@ -61,8 +61,8 @@ spec:
                             description: Min is the minimum number of nodes.
                             type: integer
                         type: object
-                      variable:
-                        description: Variable holds a list of allowed node counts.
+                      values:
+                        description: Values holds a list of allowed node counts.
                         items:
                           type: integer
                         type: array
@@ -86,7 +86,7 @@ spec:
                       properties:
                         range:
                           description: NodeRange contains a min and max or only one
-                            of them.
+                            of them (conflicts with Values).
                           properties:
                             max:
                               description: Max is the maximum number of nodes.
@@ -95,8 +95,8 @@ spec:
                               description: Min is the minimum number of nodes.
                               type: integer
                           type: object
-                        variable:
-                          description: Variable holds a list of allowed node counts.
+                        values:
+                          description: Values holds a list of allowed node counts.
                           items:
                             type: integer
                           type: array

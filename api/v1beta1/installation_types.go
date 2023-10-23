@@ -38,6 +38,8 @@ type InstallationSpec struct {
 	AirGap bool `json:"airGap"`
 	// Config holds the configuration used at installation time.
 	Config *Config `json:"config,omitempty"`
+	// Overrides holds the overrides used at installation time.
+	Overrides *Config `json:"overrides,omitempty"`
 }
 
 // InstallationStatus defines the observed state of Installation

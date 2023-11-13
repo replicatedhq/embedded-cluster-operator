@@ -139,9 +139,15 @@ func (r *InstallationReconciler) ReconcileInstallation(ctx context.Context, in *
 // previous installation objects. This is needed because we don't want to lose the last
 // node status when we create a new installation object. items is expected to be sorted
 // in descending order by creation timestamp.
-func (r *InstallationReconciler) copyLastNodeStatus(items []v1beta1.Installation) {
+func (r *InstallationReconciler) copyLastNodeStatus(items []v1beta1.Installation) error {
+	sorted := sort.SliceIsSorted(items, func(i, j int) bool {
+		return items[j].CreationTimestamp.Before(&items[i].CreationTimestamp)
+	})
+	if !sorted {
+		return fmt.Errorf("installation not sorted")
+	}
 	if len(items) == 1 || len(items[0].Status.NodesStatus) > 0 {
-		return
+		return nil
 	}
 	for i := 1; i < len(items); i++ {
 		if len(items[i].Status.NodesStatus) == 0 {
@@ -150,6 +156,7 @@ func (r *InstallationReconciler) copyLastNodeStatus(items []v1beta1.Installation
 		items[0].Status.NodesStatus = items[i].Status.NodesStatus
 		break
 	}
+	return nil
 }
 
 //+kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch
@@ -177,7 +184,9 @@ func (r *InstallationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		log.Info("No cluster ID found, reconciliation ended")
 		return ctrl.Result{}, nil
 	}
-	r.copyLastNodeStatus(items)
+	if err := r.copyLastNodeStatus(items); err != nil {
+		return ctrl.Result{}, err
+	}
 	if err := r.ReconcileInstallation(ctx, &items[0]); err != nil {
 		return ctrl.Result{}, err
 	}

@@ -10,10 +10,13 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+
+	k0sv1beta1 "github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
 )
 
 var (
-	ghurl = "https://github.com/replicatedhq/embedded-cluster/releases/download/v%s/metadata.json"
+	//ghurl = "https://github.com/replicatedhq/embedded-cluster/releases/download/v%s/metadata.json"
+	ghurl = "https://spooky.academy/embedded-cluster/v%s/metadata.json"
 	cache = map[string]*Meta{}
 	mutex = sync.Mutex{}
 )
@@ -33,6 +36,8 @@ type Meta struct {
 	Versions     Versions
 	K0sSHA       string
 	K0sBinaryURL string
+	Configs      *k0sv1beta1.HelmExtensions
+	Protected    map[string][]string
 }
 
 // MetadataFor reads metadata for a given release. Goes to GitHub releases page

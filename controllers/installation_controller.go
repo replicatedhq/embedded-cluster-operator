@@ -22,9 +22,14 @@ import (
 	"sort"
 	"time"
 
+	fmtconvert "github.com/ghodss/yaml"
+	"github.com/k0sproject/dig"
 	apv1b2 "github.com/k0sproject/k0s/pkg/apis/autopilot/v1beta2"
+	k0sv1beta1 "github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
 	apcore "github.com/k0sproject/k0s/pkg/autopilot/controller/plans/core"
 	"github.com/k0sproject/version"
+	"github.com/ohler55/ojg/jp"
+	"github.com/ohler55/ojg/oj"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,6 +38,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/yaml"
 
 	"github.com/replicatedhq/embedded-cluster-operator/api/v1beta1"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/autopilot"
@@ -229,6 +235,113 @@ func (r *InstallationReconciler) ReconcileK0sVersion(ctx context.Context, in *v1
 	return nil
 }
 
+// ReconcileHelmCharts reconciles the helm charts from the Installation metadata with the clusterconfig object.
+func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1beta1.Installation) error {
+	var clusterconfig k0sv1beta1.ClusterConfig
+
+	// add k0s scheme to our client
+	k0sv1beta1.AddToScheme(r.Scheme)
+
+	// fetch the current clusterconfig
+	if err := r.Get(ctx, client.ObjectKey{Name: "k0s", Namespace: "kube-system"}, &clusterconfig); err != nil {
+		return fmt.Errorf("failed to get cluster config: %w", err)
+	}
+
+	//meta, err := release.MetadataFor(ctx, in.Spec.Config.Version)
+	meta, err := release.MetadataFor(ctx, "0.0.1")
+	if err != nil {
+		return fmt.Errorf("failed to get release bundle: %w", err)
+	}
+
+	if meta.Configs == nil {
+		return fmt.Errorf("failed to get helm charts from release metadata")
+	}
+
+	// get the protected values from the release metadata
+	protectedValues := map[string][]string{}
+	if meta.Protected != nil {
+		protectedValues = meta.Protected
+	}
+
+	// TODO - apply unsupported override from installation config
+
+	finalConfigs := k0sv1beta1.ChartsSettings{}
+
+	for _, chart := range clusterconfig.Spec.Extensions.Helm.Charts {
+		for _, newChart := range meta.Configs.Charts {
+			if chart.Name == newChart.Name {
+
+				newValuesMap := dig.Mapping{}
+				if err := yaml.Unmarshal([]byte(newChart.Values), &newValuesMap); err != nil {
+					return fmt.Errorf("failed to unmarshal new chart values: %w", err)
+				}
+
+				// check if we have known fields for this chart
+				if _, ok := protectedValues[chart.Name]; ok {
+
+					// if we have known fields, we need to merge them forward
+					currentValuesMap := dig.Mapping{}
+					if err := yaml.Unmarshal([]byte(chart.Values), &currentValuesMap); err != nil {
+						return fmt.Errorf("failed to unmarshal current chart values: %w", err)
+					}
+
+					// merge the known fields from the current chart values to the new chart values
+					for _, path := range protectedValues[chart.Name] {
+						x, err := jp.ParseString(path)
+						if err != nil {
+							return fmt.Errorf("failed to parse json path: %w", err)
+						}
+
+						valuesJson, err := fmtconvert.YAMLToJSON([]byte(chart.Values))
+						if err != nil {
+							return fmt.Errorf("failed to convert yaml to json: %w", err)
+						}
+
+						obj, err := oj.ParseString(string(valuesJson))
+						if err != nil {
+							return fmt.Errorf("failed to parse json: %w", err)
+						}
+
+						value := x.Get(obj)
+
+						// if the value is empty, skip it
+						if len(value) < 1 {
+							continue
+						}
+
+						err = x.Set(newValuesMap, value[0])
+						if err != nil {
+							return fmt.Errorf("failed to set json path: %w", err)
+						}
+
+					}
+
+				}
+
+				newValuesYaml, err := yaml.Marshal(newValuesMap)
+				if err != nil {
+					return fmt.Errorf("failed to marshal new chart values: %w", err)
+				}
+
+				newChart.Values = string(newValuesYaml)
+				finalConfigs = append(finalConfigs, newChart)
+				break
+			}
+		}
+	}
+
+	// Replace the current chart configs with the new chart configs
+	clusterconfig.Spec.Extensions.Helm.Charts = finalConfigs
+
+	//Update the clusterconfig
+	if err := r.Update(ctx, &clusterconfig); err != nil {
+		return fmt.Errorf("failed to update cluster config: %w", err)
+	}
+
+	return nil
+
+}
+
 // SetStateBasedOnPlan sets the installation state based on the Plan state. For now we do not
 // report anything fancy but we should consider reporting here a summary of how many nodes
 // have been upgraded and how many are still pending.
@@ -380,6 +493,7 @@ func (r *InstallationReconciler) DisableOldInstallations(ctx context.Context, it
 //+kubebuilder:rbac:groups=embeddedcluster.replicated.com,resources=installations/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=embeddedcluster.replicated.com,resources=installations/finalizers,verbs=update
 //+kubebuilder:rbac:groups=autopilot.k0sproject.io,resources=plans,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=k0s.k0sproject.io,resources=clusterconfigs,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile reconcile the installation object.
 func (r *InstallationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -411,6 +525,10 @@ func (r *InstallationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 	if err := r.ReconcileK0sVersion(ctx, in); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to reconcile k0s version: %w", err)
+	}
+	log.Info("Reconciling addons")
+	if err := r.ReconcileHelmCharts(ctx, in); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to reconcile helm charts: %w", err)
 	}
 	if err := r.Status().Update(ctx, in); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update installation status: %w", err)

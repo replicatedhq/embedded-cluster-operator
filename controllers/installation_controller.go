@@ -45,8 +45,8 @@ import (
 // interval.
 var requeueAfter = time.Hour
 
-// NodeEventsBatch is a batch of node events, meants to be gathered at a given
-// time and later sent to the metrics server.
+// NodeEventsBatch is a batch of node events, meant to be gathered at a given
+// moment in time and send later on to the metrics server.
 type NodeEventsBatch struct {
 	NodesAdded   []metrics.NodeEvent
 	NodesUpdated []metrics.NodeEvent

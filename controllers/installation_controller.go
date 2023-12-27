@@ -141,20 +141,19 @@ func (r *InstallationReconciler) ReconcileNodeStatuses(ctx context.Context, in *
 
 // ReportNodesChanges reports node changes to the metrics endpoint.
 func (r *InstallationReconciler) ReportNodesChanges(ctx context.Context, in *v1beta1.Installation, batch *NodeEventsBatch) {
-	log := ctrl.LoggerFrom(ctx)
 	for _, ev := range batch.NodesAdded {
 		if err := metrics.NotifyNodeAdded(ctx, in.Spec.MetricsBaseURL, ev); err != nil {
-			log.Error(err, "failed to notify node added")
+			ctrl.LoggerFrom(ctx).Error(err, "failed to notify node added")
 		}
 	}
 	for _, ev := range batch.NodesUpdated {
 		if err := metrics.NotifyNodeUpdated(ctx, in.Spec.MetricsBaseURL, ev); err != nil {
-			log.Error(err, "failed to notify node updated")
+			ctrl.LoggerFrom(ctx).Error(err, "failed to notify node updated")
 		}
 	}
 	for _, ev := range batch.NodesRemoved {
 		if err := metrics.NotifyNodeRemoved(ctx, in.Spec.MetricsBaseURL, ev); err != nil {
-			log.Error(err, "failed to notify node removed")
+			ctrl.LoggerFrom(ctx).Error(err, "failed to notify node removed")
 		}
 	}
 }
@@ -164,21 +163,25 @@ func (r *InstallationReconciler) ReportInstallationChanges(ctx context.Context, 
 	if before.Status.State == after.Status.State {
 		return
 	}
+	var err error
 	switch after.Status.State {
 	case v1beta1.InstallationStateInstalling:
-		metrics.NotifyUpgradeStarted(ctx, after.Spec.MetricsBaseURL, metrics.UpgradeStartedEvent{
+		err = metrics.NotifyUpgradeStarted(ctx, after.Spec.MetricsBaseURL, metrics.UpgradeStartedEvent{
 			ClusterID: after.Spec.ClusterID,
 			Version:   after.Spec.Config.Version,
 		})
 	case v1beta1.InstallationStateInstalled:
-		metrics.NotifyUpgradeSucceeded(ctx, after.Spec.MetricsBaseURL, metrics.UpgradeSucceededEvent{
+		err = metrics.NotifyUpgradeSucceeded(ctx, after.Spec.MetricsBaseURL, metrics.UpgradeSucceededEvent{
 			ClusterID: after.Spec.ClusterID,
 		})
 	case v1beta1.InstallationStateFailed:
-		metrics.NotifyUpgradeFailed(ctx, after.Spec.MetricsBaseURL, metrics.UpgradeFailedEvent{
+		err = metrics.NotifyUpgradeFailed(ctx, after.Spec.MetricsBaseURL, metrics.UpgradeFailedEvent{
 			ClusterID: after.Spec.ClusterID,
 			Reason:    after.Status.Reason,
 		})
+	}
+	if err != nil {
+		ctrl.LoggerFrom(ctx).Error(err, "failed to notify cluster installation status")
 	}
 }
 

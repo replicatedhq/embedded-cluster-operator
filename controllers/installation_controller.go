@@ -431,6 +431,9 @@ func (r *InstallationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, fmt.Errorf("failed to reconcile k0s version: %w", err)
 	}
 	if err := r.Status().Update(ctx, in); err != nil {
+		if errors.IsConflict(err) {
+			return ctrl.Result{}, fmt.Errorf("failed to update status: conflict.")
+		}
 		return ctrl.Result{}, fmt.Errorf("failed to update installation status: %w", err)
 	}
 	r.DisableOldInstallations(ctx, items)

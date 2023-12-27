@@ -45,6 +45,14 @@ import (
 // interval.
 var requeueAfter = time.Hour
 
+// NodeEventsBatch is a batch of node events, meants to be gathered at a given
+// time and later sent to the metrics server.
+type NodeEventsBatch struct {
+	NodesAdded   []metrics.NodeEvent
+	NodesUpdated []metrics.NodeEvent
+	NodesRemoved []metrics.NodeRemovedEvent
+}
+
 // InstallationReconciler reconciles a Installation object
 type InstallationReconciler struct {
 	client.Client
@@ -88,37 +96,32 @@ func (r *InstallationReconciler) UpdateNodeStatus(in *v1beta1.Installation, ev m
 
 // ReconcileNodeStatuses reconciles the node statuses in the Installation object status. Installation
 // is not updated remotely but only in the memory representation of the object (aka caller must save
-// the object after the call).
-func (r *InstallationReconciler) ReconcileNodeStatuses(ctx context.Context, in *v1beta1.Installation) error {
+// the object after the call). This function returns a batch of events that need to be sent back to
+// the metrics endpoint, these events represent changes in the node statuses.
+func (r *InstallationReconciler) ReconcileNodeStatuses(ctx context.Context, in *v1beta1.Installation) (*NodeEventsBatch, error) {
 	var nodes corev1.NodeList
 	if err := r.List(ctx, &nodes); err != nil {
-		return fmt.Errorf("failed to list nodes: %w", err)
+		return nil, fmt.Errorf("failed to list nodes: %w", err)
 	}
+	batch := &NodeEventsBatch{}
 	seen := map[string]bool{}
 	for _, node := range nodes.Items {
 		seen[node.Name] = true
 		event := metrics.NodeEventFromNode(in.Spec.ClusterID, node)
 		changed, isnew, err := r.NodeHasChanged(in, event)
 		if err != nil {
-			return fmt.Errorf("failed to check if node has changed: %w", err)
+			return nil, fmt.Errorf("failed to check if node has changed: %w", err)
 		} else if !changed {
 			continue
 		}
 		if err := r.UpdateNodeStatus(in, event); err != nil {
-			return fmt.Errorf("failed to update node status: %w", err)
-		}
-		if in.Spec.AirGap {
-			continue
+			return nil, fmt.Errorf("failed to update node status: %w", err)
 		}
 		if isnew {
-			if err := metrics.NotifyNodeAdded(ctx, in.Spec.MetricsBaseURL, event); err != nil {
-				return fmt.Errorf("failed to notify node added: %w", err)
-			}
+			batch.NodesAdded = append(batch.NodesAdded, event)
 			continue
 		}
-		if err := metrics.NotifyNodeUpdated(ctx, in.Spec.MetricsBaseURL, event); err != nil {
-			return fmt.Errorf("failed to notify node updated: %w", err)
-		}
+		batch.NodesUpdated = append(batch.NodesUpdated, event)
 	}
 	trimmed := []v1beta1.NodeStatus{}
 	for _, nodeStatus := range in.Status.NodesStatus {
@@ -126,25 +129,39 @@ func (r *InstallationReconciler) ReconcileNodeStatuses(ctx context.Context, in *
 			trimmed = append(trimmed, nodeStatus)
 			continue
 		}
-		if in.Spec.AirGap {
-			continue
-		}
 		rmevent := metrics.NodeRemovedEvent{
-			ClusterID: in.Spec.ClusterID,
-			NodeName:  nodeStatus.Name,
+			ClusterID: in.Spec.ClusterID, NodeName: nodeStatus.Name,
 		}
-		if err := metrics.NotifyNodeRemoved(ctx, in.Spec.MetricsBaseURL, rmevent); err != nil {
-			return fmt.Errorf("failed to notify node removed: %w", err)
-		}
+		batch.NodesRemoved = append(batch.NodesRemoved, rmevent)
 	}
 	sort.SliceStable(trimmed, func(i, j int) bool { return trimmed[i].Name < trimmed[j].Name })
 	in.Status.NodesStatus = trimmed
-	return nil
+	return batch, nil
+}
+
+// ReportNodesChanges reports node changes to the metrics endpoint.
+func (r *InstallationReconciler) ReportNodesChanges(ctx context.Context, in *v1beta1.Installation, batch *NodeEventsBatch) {
+	log := ctrl.LoggerFrom(ctx)
+	for _, ev := range batch.NodesAdded {
+		if err := metrics.NotifyNodeAdded(ctx, in.Spec.MetricsBaseURL, ev); err != nil {
+			log.Error(err, "failed to notify node added")
+		}
+	}
+	for _, ev := range batch.NodesUpdated {
+		if err := metrics.NotifyNodeUpdated(ctx, in.Spec.MetricsBaseURL, ev); err != nil {
+			log.Error(err, "failed to notify node updated")
+		}
+	}
+	for _, ev := range batch.NodesRemoved {
+		if err := metrics.NotifyNodeRemoved(ctx, in.Spec.MetricsBaseURL, ev); err != nil {
+			log.Error(err, "failed to notify node removed")
+		}
+	}
 }
 
 // ReportInstallationChanges reports back to the metrics server if the installation status has changed.
 func (r *InstallationReconciler) ReportInstallationChanges(ctx context.Context, before, after *v1beta1.Installation) {
-	if after.Spec.AirGap || before.Status.State == after.Status.State {
+	if before.Status.State == after.Status.State {
 		return
 	}
 	switch after.Status.State {
@@ -406,7 +423,8 @@ func (r *InstallationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 	before := in.DeepCopy()
-	if err := r.ReconcileNodeStatuses(ctx, in); err != nil {
+	events, err := r.ReconcileNodeStatuses(ctx, in)
+	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to reconcile node status: %w", err)
 	}
 	if err := r.ReconcileK0sVersion(ctx, in); err != nil {
@@ -416,7 +434,10 @@ func (r *InstallationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, fmt.Errorf("failed to update installation status: %w", err)
 	}
 	r.DisableOldInstallations(ctx, items)
-	r.ReportInstallationChanges(ctx, before, in)
+	if !in.Spec.AirGap {
+		r.ReportInstallationChanges(ctx, before, in)
+		r.ReportNodesChanges(ctx, in, events)
+	}
 	log.Info("Installation reconciliation ended")
 	return ctrl.Result{RequeueAfter: requeueAfter}, nil
 }

@@ -15,8 +15,7 @@ import (
 )
 
 var (
-	//ghurl = "https://github.com/replicatedhq/embedded-cluster/releases/download/v%s/metadata.json"
-	ghurl = "https://spooky.academy/embedded-cluster/v%s/metadata.json"
+	ghurl = "https://github.com/replicatedhq/embedded-cluster/releases/download/v%s/metadata.json"
 	cache = map[string]*Meta{}
 	mutex = sync.Mutex{}
 )

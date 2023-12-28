@@ -247,8 +247,7 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 		return fmt.Errorf("failed to get cluster config: %w", err)
 	}
 
-	//meta, err := release.MetadataFor(ctx, in.Spec.Config.Version)
-	meta, err := release.MetadataFor(ctx, "0.0.1")
+	meta, err := release.MetadataFor(ctx, in.Spec.Config.Version)
 	if err != nil {
 		return fmt.Errorf("failed to get release bundle: %w", err)
 	}

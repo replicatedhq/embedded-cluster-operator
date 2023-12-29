@@ -239,9 +239,6 @@ func (r *InstallationReconciler) ReconcileK0sVersion(ctx context.Context, in *v1
 func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1beta1.Installation) error {
 	var clusterconfig k0sv1beta1.ClusterConfig
 
-	// add k0s scheme to our client
-	k0sv1beta1.AddToScheme(r.Scheme)
-
 	// fetch the current clusterconfig
 	if err := r.Get(ctx, client.ObjectKey{Name: "k0s", Namespace: "kube-system"}, &clusterconfig); err != nil {
 		return fmt.Errorf("failed to get cluster config: %w", err)

@@ -235,35 +235,31 @@ func (r *InstallationReconciler) ReconcileK0sVersion(ctx context.Context, in *v1
 	return nil
 }
 
-// MergeValues takes two chart configs and a list of values (in jsonpath notation) to not override
-// and combines the values, and returns the resultant yaml as []byte
+// MergeValues takes two helm values in the form of dig.Mapping{} and a list of values (in jsonpath notation) to not override
+// and combines the values. it returns the resultant yaml string
 // TODO - write a test for this
-func MergeValues(oldChart, newChart k0sv1beta1.Chart, protectedValues []string) ([]byte, error) {
-	currentValuesMap := dig.Mapping{}
-	if err := yaml.Unmarshal([]byte(oldChart.Values), &currentValuesMap); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal current chart values: %w", err)
-	}
+func MergeValues(oldValues, newValues string, protectedValues []string) (string, error) {
 
   newValuesMap := dig.Mapping{}
-  if err := yaml.Unmarshal([]byte(newChart.Values), &newValuesMap); err != nil {
-    return nil, fmt.Errorf("failed to unmarshal new chart values: %w", err)
+  if err := yaml.Unmarshal([]byte(newValues), &newValuesMap); err != nil {
+    return "", fmt.Errorf("failed to unmarshal new chart values: %w", err)
   }
 
 	// merge the known fields from the current chart values to the new chart values
 	for _, path := range protectedValues {
 		x, err := jp.ParseString(path)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse json path: %w", err)
+			return "", fmt.Errorf("failed to parse json path: %w", err)
 		}
 
-		valuesJson, err := fmtconvert.YAMLToJSON([]byte(oldChart.Values))
+		valuesJson, err := fmtconvert.YAMLToJSON([]byte(oldValues))
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert yaml to json: %w", err)
+			return "", fmt.Errorf("failed to convert yaml to json: %w", err)
 		}
 
 		obj, err := oj.ParseString(string(valuesJson))
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse json: %w", err)
+			return "", fmt.Errorf("failed to parse json: %w", err)
 		}
 
 		value := x.Get(obj)
@@ -275,15 +271,15 @@ func MergeValues(oldChart, newChart k0sv1beta1.Chart, protectedValues []string) 
 
 		err = x.Set(newValuesMap, value[0])
 		if err != nil {
-			return nil, fmt.Errorf("failed to set json path: %w", err)
+			return "", fmt.Errorf("failed to set json path: %w", err)
 		}
 	}
 
 	newValuesYaml, err := yaml.Marshal(newValuesMap)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal new chart values: %w", err)
+		return "", fmt.Errorf("failed to marshal new chart values: %w", err)
 	}
-	return newValuesYaml, nil
+	return string(newValuesYaml), nil
 
 }
 
@@ -317,19 +313,21 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 	for _, chart := range clusterconfig.Spec.Extensions.Helm.Charts {
 		for _, newChart := range meta.Configs.Charts {
 
-      // check if we can skip this chart
-      _, ok := protectedValues[chart.Name]
+			// check if we can skip this chart
+			_, ok := protectedValues[chart.Name]
 			if chart.Name != newChart.Name || !ok {
 				continue
 			}
 
 			// if we have known fields, we need to merge them forward
-      newValuesYaml,err := MergeValues(chart, newChart, protectedValues[chart.Name])
-      if err != nil {
-        return fmt.Errorf("failed to merge chart values: %w", err)
-      }
 
-			newChart.Values = string(newValuesYaml)
+			newValuesYaml, err := MergeValues(chart.Values, newChart.Values, protectedValues[chart.Name])
+			if err != nil {
+				return fmt.Errorf("failed to merge chart values: %w", err)
+			}
+
+			newChart.Values = newValuesYaml
+
 			finalConfigs = append(finalConfigs, newChart)
 			break
 		}

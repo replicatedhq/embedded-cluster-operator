@@ -3,13 +3,13 @@ module github.com/replicatedhq/embedded-cluster-operator
 go 1.21.0
 
 require (
-	github.com/ghodss/yaml v1.0.0
 	github.com/k0sproject/dig v0.2.0
 	github.com/k0sproject/k0s v1.28.5-0.20231116142149-82f76181191c
 	github.com/k0sproject/version v0.4.2
 	github.com/ohler55/ojg v1.21.0
 	github.com/onsi/ginkgo/v2 v2.13.2
 	github.com/onsi/gomega v1.30.0
+	gotest.tools/v3 v3.5.1
 	k8s.io/api v0.29.0
 	k8s.io/apimachinery v0.29.0
 	k8s.io/client-go v0.29.0

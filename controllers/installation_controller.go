@@ -22,7 +22,6 @@ import (
 	"sort"
 	"time"
 
-	fmtconvert "github.com/ghodss/yaml"
 	"github.com/k0sproject/dig"
 	apv1b2 "github.com/k0sproject/k0s/pkg/apis/autopilot/v1beta2"
 	k0sv1beta1 "github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
@@ -252,7 +251,7 @@ func MergeValues(oldValues, newValues string, protectedValues []string) (string,
 			return "", fmt.Errorf("failed to parse json path: %w", err)
 		}
 
-		valuesJson, err := fmtconvert.YAMLToJSON([]byte(oldValues))
+		valuesJson, err := yaml.YAMLToJSON([]byte(oldValues))
 		if err != nil {
 			return "", fmt.Errorf("failed to convert yaml to json: %w", err)
 		}

@@ -250,7 +250,7 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 	}
 
 	if meta.Configs == nil {
-		return fmt.Errorf("failed to get helm charts from release metadata")
+    return nil
 	}
 
 	// get the protected values from the release metadata

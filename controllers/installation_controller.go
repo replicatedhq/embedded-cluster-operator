@@ -236,7 +236,6 @@ func (r *InstallationReconciler) ReconcileK0sVersion(ctx context.Context, in *v1
 
 // MergeValues takes two helm values in the form of dig.Mapping{} and a list of values (in jsonpath notation) to not override
 // and combines the values. it returns the resultant yaml string
-// TODO - write a test for this
 func MergeValues(oldValues, newValues string, protectedValues []string) (string, error) {
 
   newValuesMap := dig.Mapping{}

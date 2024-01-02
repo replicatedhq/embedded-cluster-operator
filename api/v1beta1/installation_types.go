@@ -59,6 +59,10 @@ type InstallationStatus struct {
 	State string `json:"state,omitempty"`
 	// Reason holds the reason for the current state.
 	Reason string `json:"reason,omitempty"`
+  // AddonState holds the current state of the addon charts
+  AddonState string `json:"addonState,omitempty"`
+  // AddonReason holds the reason for the current addon State
+  AddonReason string `json:"addonReason,omitempty"`
 }
 
 // SetState sets the installation state and reason.

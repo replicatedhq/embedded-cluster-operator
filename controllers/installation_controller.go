@@ -295,6 +295,7 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 		return fmt.Errorf("failed to get release bundle: %w", err)
 	}
 
+  // skip if the new release has no addon configs
 	if meta.Configs == nil {
 		return nil
 	}
@@ -318,14 +319,12 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 			}
 
 			// if we have known fields, we need to merge them forward
-
 			newValuesYaml, err := MergeValues(chart.Values, newChart.Values, protectedValues[chart.Name])
 			if err != nil {
 				return fmt.Errorf("failed to merge chart values: %w", err)
 			}
 
 			newChart.Values = newValuesYaml
-
 			finalConfigs = append(finalConfigs, newChart)
 			break
 		}
@@ -336,9 +335,12 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 
 	//Update the clusterconfig
 	if err := r.Update(ctx, &clusterconfig); err != nil {
+    in.Status.AddonState = "failed"
+    in.Status.AddonReason = fmt.Sprintf("Failed to update cluster config: %s",err)
 		return fmt.Errorf("failed to update cluster config: %w", err)
 	}
 
+  in.Status.AddonState = "reconciled"
 	return nil
 }
 

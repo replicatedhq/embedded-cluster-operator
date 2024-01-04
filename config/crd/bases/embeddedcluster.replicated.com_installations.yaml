@@ -148,6 +148,10 @@ spec:
                   version:
                     type: string
                 type: object
+              endUserK0sConfigOverrides:
+                description: EndUserK0sConfigOverrides holds the end user k0s config
+                  overrides used at installation time.
+                type: string
               metricsBaseURL:
                 description: MetricsBaseURL holds the base URL for the metrics server.
                 type: string

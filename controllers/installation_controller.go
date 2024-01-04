@@ -301,10 +301,15 @@ func checkAllNodesReady(r *InstallationReconciler, ctx context.Context) (bool, e
 
 // ReconcileHelmCharts reconciles the helm charts from the Installation metadata with the clusterconfig object.
 func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1beta1.Installation) error {
+  log := ctrl.LoggerFrom(ctx)
 	var clusterconfig k0sv1beta1.ClusterConfig
 
   // skip if there's no config in the installer spec
 	if in.Spec.Config == nil {
+    log.Info("addons","configcheck","no config")
+    if in.Status.State == v1beta1.InstallationStateKubernetesInstalled {
+      in.Status.SetState(v1beta1.InstallationStateInstalled, "Installed")
+    }
 		return nil
 	}
 
@@ -315,6 +320,10 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 
 	// skip if the new release has no addon configs
 	if meta.Configs == nil {
+    log.Info("addons","configcheck","no addons")
+    if in.Status.State == v1beta1.InstallationStateKubernetesInstalled {
+      in.Status.SetState(v1beta1.InstallationStateInstalled, "Installed")
+    }
 		return nil
 	}
 
@@ -336,10 +345,13 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
       }
       // check for version drift between installed charts and charts in the installer metadata
       for _,targetChart := range targetCharts {
-        if targetChart.Name != chart.Name {
+        if targetChart.Name != chart.Status.ReleaseName {
           continue
         }
+        log.Info("addons","targetChart",targetChart.Name,"chart",chart.Status.ReleaseName)
+        log.Info("addons","targetVersion",targetChart.Version,"InstalledVersion",chart.Spec.Version)
         if targetChart.Version != chart.Spec.Version {
+          log.Info("addons","versionmismatch",true)
           chartDrift++
         }
       }
@@ -352,6 +364,7 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
     }
 
     // If all addons match their target version, mark installation as complete
+    log.Info("addons","chartdrift",chartDrift)
     if chartDrift == 0 { 
       in.Status.SetState(v1beta1.InstallationStateInstalled,"Addons upgraded")
       return nil

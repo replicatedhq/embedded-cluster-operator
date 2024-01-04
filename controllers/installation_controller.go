@@ -238,10 +238,10 @@ func (r *InstallationReconciler) ReconcileK0sVersion(ctx context.Context, in *v1
 // and combines the values. it returns the resultant yaml string
 func MergeValues(oldValues, newValues string, protectedValues []string) (string, error) {
 
-  newValuesMap := dig.Mapping{}
-  if err := yaml.Unmarshal([]byte(newValues), &newValuesMap); err != nil {
-    return "", fmt.Errorf("failed to unmarshal new chart values: %w", err)
-  }
+	newValuesMap := dig.Mapping{}
+	if err := yaml.Unmarshal([]byte(newValues), &newValuesMap); err != nil {
+		return "", fmt.Errorf("failed to unmarshal new chart values: %w", err)
+	}
 
 	// merge the known fields from the current chart values to the new chart values
 	for _, path := range protectedValues {
@@ -281,8 +281,21 @@ func MergeValues(oldValues, newValues string, protectedValues []string) (string,
 
 }
 
+func checkAllNodesReady(nodes corev1.NodeList) bool {
+	for _, node := range nodes.Items {
+		for _, condition := range node.Status.Conditions {
+			fmt.Printf("\t%s: %s\n", condition.Type, condition.Status)
+			if condition.Type == "Ready" && condition.Status == "False" || condition.Status == "Unknown" {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 // ReconcileHelmCharts reconciles the helm charts from the Installation metadata with the clusterconfig object.
 func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1beta1.Installation) error {
+	log := ctrl.LoggerFrom(ctx)
 	var clusterconfig k0sv1beta1.ClusterConfig
 
 	// fetch the current clusterconfig
@@ -290,16 +303,16 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 		return fmt.Errorf("failed to get cluster config: %w", err)
 	}
 
-  if in.Spec.Config == nil {
-    return nil
-  }
+	if in.Spec.Config == nil {
+		return nil
+	}
 
 	meta, err := release.MetadataFor(ctx, in.Spec.Config.Version)
 	if err != nil {
 		return fmt.Errorf("failed to get release bundle: %w", err)
 	}
 
-  // skip if the new release has no addon configs
+	// skip if the new release has no addon configs
 	if meta.Configs == nil {
 		return nil
 	}
@@ -337,14 +350,29 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 	// Replace the current chart configs with the new chart configs
 	clusterconfig.Spec.Extensions.Helm.Charts = finalConfigs
 
+	// Wait for all nodes to be ready
+	// This is only temporary intil upstream k0s fixes
+	// helm chart reconciliation for multi-node cluster
+	// being broken by etcd leadership election
+	var nodes corev1.NodeList
+	if err := r.List(ctx, &nodes); err != nil {
+		return fmt.Errorf("failed to list nodes: %w", err)
+	}
+
+	log.Info("waiting for all nodes to be ready")
+	allReady := false
+	for allReady {
+		allReady = checkAllNodesReady(nodes)
+	}
+
 	//Update the clusterconfig
 	if err := r.Update(ctx, &clusterconfig); err != nil {
-    in.Status.AddonState = "failed"
-    in.Status.AddonReason = fmt.Sprintf("Failed to update cluster config: %s",err)
+		in.Status.AddonState = "failed"
+		in.Status.AddonReason = fmt.Sprintf("Failed to update cluster config: %s", err)
 		return fmt.Errorf("failed to update cluster config: %w", err)
 	}
 
-  in.Status.AddonState = "reconciled"
+	in.Status.AddonState = "reconciled"
 	return nil
 }
 

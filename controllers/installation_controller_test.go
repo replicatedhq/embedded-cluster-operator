@@ -9,38 +9,38 @@ import (
 )
 
 func TestMergeValues(t *testing.T) {
-  oldData := `
+	oldData := `
   password: "foo"
   someField: "asdf"
   other: "text"
   `
-  newData := `
+	newData := `
   someField: "newstring"
   other: "text"
   `
-  protect := []string{"password"}
+	protect := []string{"password"}
 
-  targetData := `
+	targetData := `
   password: "foo"
   someField: "newstring"
   other: "text"
   `
 
-  mergedValues, err := MergeValues(oldData, newData, protect)
-  if err != nil {
-    t.Fail()
-  }
+	mergedValues, err := MergeValues(oldData, newData, protect)
+	if err != nil {
+		t.Fail()
+	}
 
-  targetDataMap := dig.Mapping{}
-  if err := yaml.Unmarshal([]byte(targetData), &targetDataMap); err != nil {
-    t.Fail()
-  }
+	targetDataMap := dig.Mapping{}
+	if err := yaml.Unmarshal([]byte(targetData), &targetDataMap); err != nil {
+		t.Fail()
+	}
 
-  mergedDataMap := dig.Mapping{}
-  if err := yaml.Unmarshal([]byte(mergedValues), &mergedDataMap); err != nil {
-    t.Fail()
-  }
+	mergedDataMap := dig.Mapping{}
+	if err := yaml.Unmarshal([]byte(mergedValues), &mergedDataMap); err != nil {
+		t.Fail()
+	}
 
-  assert.DeepEqual(t,targetDataMap,mergedDataMap)
+	assert.DeepEqual(t, targetDataMap, mergedDataMap)
 
 }

@@ -51,7 +51,7 @@ func init() {
 
 	utilruntime.Must(embeddedclusterv1beta1.AddToScheme(scheme))
 	utilruntime.Must(autopilotv1beta2.AddToScheme(scheme))
-  utilruntime.Must(k0sv1beta1.AddToScheme(scheme))
+	utilruntime.Must(k0sv1beta1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 

@@ -22,13 +22,15 @@ import (
 
 // What follows is a list of all valid states for an Installation object.
 const (
-	InstallationStateWaiting    string = "Waiting"
-	InstallationStateEnqueued   string = "Enqueued"
-	InstallationStateInstalling string = "Installing"
-	InstallationStateInstalled  string = "Installed"
-	InstallationStateObsolete   string = "Obsolete"
-	InstallationStateFailed     string = "Failed"
-	InstallationStateUnknown    string = "Unknown"
+	InstallationStateWaiting             string = "Waiting"
+	InstallationStateEnqueued            string = "Enqueued"
+	InstallationStateInstalling          string = "Installing"
+	InstallationStateInstalled           string = "Installed"
+	InstallationStateKubernetesInstalled string = "KubernetesInstalled"
+	InstallationStateAddonsInstalling    string = "AddonsInstalling"
+	InstallationStateObsolete            string = "Obsolete"
+	InstallationStateFailed              string = "Failed"
+	InstallationStateUnknown             string = "Unknown"
 )
 
 // NodeStatus is used to keep track of the status of a cluster node, we
@@ -59,10 +61,6 @@ type InstallationStatus struct {
 	State string `json:"state,omitempty"`
 	// Reason holds the reason for the current state.
 	Reason string `json:"reason,omitempty"`
-	// AddonState holds the current state of the addon charts
-	AddonState string `json:"addonState,omitempty"`
-	// AddonReason holds the reason for the current addon State
-	AddonReason string `json:"addonReason,omitempty"`
 }
 
 // SetState sets the installation state and reason.

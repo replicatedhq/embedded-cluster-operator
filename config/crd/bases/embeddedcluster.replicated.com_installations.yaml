@@ -157,12 +157,6 @@ spec:
           status:
             description: InstallationStatus defines the observed state of Installation
             properties:
-              addonReason:
-                description: AddonReason holds the reason for the current addon State
-                type: string
-              addonState:
-                description: AddonState holds the current state of the addon charts
-                type: string
               nodesStatus:
                 description: NodesStatus is a list of nodes and their status.
                 items:

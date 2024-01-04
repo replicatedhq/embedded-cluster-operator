@@ -281,16 +281,20 @@ func MergeValues(oldValues, newValues string, protectedValues []string) (string,
 
 }
 
-func checkAllNodesReady(nodes corev1.NodeList) bool {
+func checkAllNodesReady(r *InstallationReconciler, ctx context.Context) (bool,error) {
+	var nodes corev1.NodeList
+	if err := r.List(ctx, &nodes); err != nil {
+		return false, fmt.Errorf("failed to list nodes: %w", err)
+	}
 	for _, node := range nodes.Items {
 		for _, condition := range node.Status.Conditions {
 			fmt.Printf("\t%s: %s\n", condition.Type, condition.Status)
 			if condition.Type == "Ready" && condition.Status == "False" || condition.Status == "Unknown" {
-				return false
+				return false, nil
 			}
 		}
 	}
-	return true
+	return true, nil
 }
 
 // ReconcileHelmCharts reconciles the helm charts from the Installation metadata with the clusterconfig object.
@@ -354,15 +358,14 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 	// This is only temporary intil upstream k0s fixes
 	// helm chart reconciliation for multi-node cluster
 	// being broken by etcd leadership election
-	var nodes corev1.NodeList
-	if err := r.List(ctx, &nodes); err != nil {
-		return fmt.Errorf("failed to list nodes: %w", err)
-	}
-
 	log.Info("waiting for all nodes to be ready")
 	allReady := false
 	for allReady {
-		allReady = checkAllNodesReady(nodes)
+		allReady,err = checkAllNodesReady(r, ctx)
+    if err != nil {
+      return fmt.Errorf("failed to wait for nodes: %w", err)
+    }
+    time.Sleep(time.Second * 2)
 	}
 
 	//Update the clusterconfig

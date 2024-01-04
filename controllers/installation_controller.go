@@ -624,8 +624,6 @@ func (r *InstallationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 	in := r.CoalesceInstallations(ctx, items)
-	// TODO - remove before merge, this mutes metrics
-	in.Spec.AirGap = true
 	if in.Spec.ClusterID == "" {
 		log.Info("No cluster ID found, reconciliation ended")
 		return ctrl.Result{}, nil

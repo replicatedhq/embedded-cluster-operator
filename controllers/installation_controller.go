@@ -20,10 +20,12 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/k0sproject/dig"
 	apv1b2 "github.com/k0sproject/k0s/pkg/apis/autopilot/v1beta2"
+	k0shelm "github.com/k0sproject/k0s/pkg/apis/helm/v1beta1"
 	k0sv1beta1 "github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
 	apcore "github.com/k0sproject/k0s/pkg/autopilot/controller/plans/core"
 	"github.com/k0sproject/version"
@@ -176,7 +178,7 @@ func (r *InstallationReconciler) ReportInstallationChanges(ctx context.Context, 
 // latest plan status.
 func (r *InstallationReconciler) ReconcileK0sVersion(ctx context.Context, in *v1beta1.Installation) error {
 	if in.Spec.Config == nil || in.Spec.Config.Version == "" {
-		in.Status.SetState(v1beta1.InstallationStateInstalled, "")
+		in.Status.SetState(v1beta1.InstallationStateKubernetesInstalled, "")
 		return nil
 	}
 	meta, err := release.MetadataFor(ctx, in.Spec.Config.Version)
@@ -190,7 +192,7 @@ func (r *InstallationReconciler) ReconcileK0sVersion(ctx context.Context, in *v1
 	}
 	runningVersion := vinfo.GitVersion
 	if runningVersion == meta.Versions.Kubernetes {
-		in.Status.SetState(v1beta1.InstallationStateInstalled, "")
+		in.Status.SetState(v1beta1.InstallationStateKubernetesInstalled, "")
 		return nil
 	}
 	running, err := version.NewVersion(runningVersion)
@@ -298,37 +300,78 @@ func checkAllNodesReady(r *InstallationReconciler, ctx context.Context) (bool, e
 }
 
 // ReconcileHelmCharts reconciles the helm charts from the Installation metadata with the clusterconfig object.
-func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1beta1.Installation) (bool, error) {
-	log := ctrl.LoggerFrom(ctx)
+func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1beta1.Installation) error {
 	var clusterconfig k0sv1beta1.ClusterConfig
 
-	// We want to skip and requeue if the k0s upgrade is still in progress
-	if in.Status.State != v1beta1.InstallationStateKubernetesInstalled {
-		return true, nil
-	}
-
-	// skip if installer is already complete
-	if in.Status.State == v1beta1.InstallationStateInstalled {
-		return false, nil
-	}
-
-	// fetch the current clusterconfig
-	if err := r.Get(ctx, client.ObjectKey{Name: "k0s", Namespace: "kube-system"}, &clusterconfig); err != nil {
-		return false, fmt.Errorf("failed to get cluster config: %w", err)
-	}
-
+  // skip if there's no config in the installer spec
 	if in.Spec.Config == nil {
-		return false, nil
+		return nil
 	}
 
 	meta, err := release.MetadataFor(ctx, in.Spec.Config.Version)
 	if err != nil {
-		return false, fmt.Errorf("failed to get release bundle: %w", err)
+		return fmt.Errorf("failed to get release bundle: %w", err)
 	}
 
 	// skip if the new release has no addon configs
 	if meta.Configs == nil {
-		return false, nil
+		return nil
+	}
+
+	if in.Status.State == v1beta1.InstallationStateKubernetesInstalled || in.Status.State == v1beta1.InstallationStateHelmChartUpdateFailure {
+    var installedCharts k0shelm.ChartList
+    if err := r.List(ctx, &installedCharts); err != nil {
+      return fmt.Errorf("failed to list nodes: %w", err)
+    }
+
+    targetCharts := meta.Configs.Charts
+
+    chartErrors := []string{}
+    chartDrift := 0
+    // grab the installed charts
+    for _,chart := range installedCharts.Items {
+      // extract any errors from installed charts
+      if chart.Status.Error != "" {
+        chartErrors = append(chartErrors, chart.Status.Error)
+      }
+      // check for version drift between installed charts and charts in the installer metadata
+      for _,targetChart := range targetCharts {
+        if targetChart.Name != chart.Name {
+          continue
+        }
+        if targetChart.Version != chart.Spec.Version {
+          chartDrift++
+        }
+      }
+    }
+
+    // If any chart has errors, update installer state and return
+    if len(chartErrors) > 0 {
+      in.Status.SetState(v1beta1.InstallationStateHelmChartUpdateFailure,strings.Join(chartErrors,","))
+      return nil
+    }
+
+    // If all addons match their target version, mark installation as complete
+    if chartDrift == 0 { 
+      in.Status.SetState(v1beta1.InstallationStateInstalled,"Addons upgraded")
+      return nil
+    }
+
+  }
+
+	// skip if installer is already complete
+	if in.Status.State == v1beta1.InstallationStateInstalled {
+		return nil
+	}
+
+	// We want to skip and requeue if the k0s upgrade is still in progress
+	if in.Status.State != v1beta1.InstallationStateKubernetesInstalled {
+		return nil
+	}
+
+	// fetch the current clusterconfig
+	if err := r.Get(ctx, client.ObjectKey{Name: "k0s", Namespace: "kube-system"}, &clusterconfig); err != nil {
+		return fmt.Errorf("failed to get cluster config: %w", err)
 	}
 
 	// get the protected values from the release metadata
@@ -352,7 +395,7 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 			// if we have known fields, we need to merge them forward
 			newValuesYaml, err := MergeValues(chart.Values, newChart.Values, protectedValues[chart.Name])
 			if err != nil {
-				return false, fmt.Errorf("failed to merge chart values: %w", err)
+				return fmt.Errorf("failed to merge chart values: %w", err)
 			}
 
 			newChart.Values = newValuesYaml
@@ -364,26 +407,14 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 	// Replace the current chart configs with the new chart configs
 	clusterconfig.Spec.Extensions.Helm.Charts = finalConfigs
 
-	// Wait for all nodes to be ready
-	// This is only temporary intil upstream k0s fixes
-	// helm chart reconciliation for multi-node cluster
-	// being broken by etcd leadership election
-	log.Info("waiting for all nodes to be ready")
-	allReady := false
-	for allReady {
-		allReady, err = checkAllNodesReady(r, ctx)
-		if err != nil {
-			return false, fmt.Errorf("failed to wait for nodes: %w", err)
-		}
-		time.Sleep(time.Second * 2)
-	}
+  in.Status.SetState(v1beta1.InstallationStateAddonsInstalling, "Installing addons")
 
 	//Update the clusterconfig
 	if err := r.Update(ctx, &clusterconfig); err != nil {
-		return false, fmt.Errorf("failed to update cluster config: %w", err)
+		return fmt.Errorf("failed to update cluster config: %w", err)
 	}
 
-	return false, nil
+	return nil
 }
 
 // SetStateBasedOnPlan sets the installation state based on the Plan state. For now we do not
@@ -411,7 +442,7 @@ func (r *InstallationReconciler) SetStateBasedOnPlan(in *v1beta1.Installation, p
 	case apcore.PlanSchedulableWait:
 		in.Status.SetState(v1beta1.InstallationStateInstalling, reason)
 	case apcore.PlanCompleted:
-		in.Status.SetState(v1beta1.InstallationStateInstalled, reason)
+		in.Status.SetState(v1beta1.InstallationStateKubernetesInstalled, reason)
 	default:
 		in.Status.SetState(v1beta1.InstallationStateFailed, reason)
 	}
@@ -538,6 +569,7 @@ func (r *InstallationReconciler) DisableOldInstallations(ctx context.Context, it
 //+kubebuilder:rbac:groups=embeddedcluster.replicated.com,resources=installations/finalizers,verbs=update
 //+kubebuilder:rbac:groups=autopilot.k0sproject.io,resources=plans,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=k0s.k0sproject.io,resources=clusterconfigs,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=helm.k0sproject.io,resources=charts,verbs=get;list
 
 // Reconcile reconcile the installation object.
 func (r *InstallationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -559,15 +591,13 @@ func (r *InstallationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 	in := r.CoalesceInstallations(ctx, items)
-  in.Spec.AirGap = true
+	// TODO - remove before merge, this mutes metrics
+	in.Spec.AirGap = true
 	if in.Spec.ClusterID == "" {
 		log.Info("No cluster ID found, reconciliation ended")
 		return ctrl.Result{}, nil
 	}
 	before := in.DeepCopy()
-	durations := []time.Duration{}
-	durations = append(durations, requeueAfter)
-
 	if err := r.ReconcileNodeStatuses(ctx, in); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to reconcile node status: %w", err)
 	}
@@ -575,23 +605,16 @@ func (r *InstallationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, fmt.Errorf("failed to reconcile k0s version: %w", err)
 	}
 	log.Info("Reconciling addons")
-
-	if wantsRequeue, err := r.ReconcileHelmCharts(ctx, in); err != nil {
+	if err := r.ReconcileHelmCharts(ctx, in); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to reconcile helm charts: %w", err)
-	} else if wantsRequeue {
-		durations = append(durations, time.Minute*2)
-	}
-
+  }
 	if err := r.Status().Update(ctx, in); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update installation status: %w", err)
 	}
 	r.DisableOldInstallations(ctx, items)
 	r.ReportInstallationChanges(ctx, before, in)
 	log.Info("Installation reconciliation ended")
-
-	fmt.Println(durations)
 	return ctrl.Result{RequeueAfter: requeueAfter}, nil
-
 }
 
 // SetupWithManager sets up the controller with the Manager.

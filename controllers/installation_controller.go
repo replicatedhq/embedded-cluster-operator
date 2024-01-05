@@ -356,7 +356,7 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
     targetCharts := meta.Configs.Charts
 
     chartErrors := []string{}
-    chartDrift := 0
+    chartDrift := false
     // grab the installed charts
     for _,chart := range installedCharts.Items {
       // extract any errors from installed charts
@@ -368,11 +368,8 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
         if targetChart.Name != chart.Status.ReleaseName {
           continue
         }
-        log.Info("addons","targetChart",targetChart.Name,"chart",chart.Status.ReleaseName)
-        log.Info("addons","targetVersion",targetChart.Version,"InstalledVersion",chart.Spec.Version)
         if targetChart.Version != chart.Spec.Version {
-          log.Info("addons","versionmismatch",true)
-          chartDrift++
+          chartDrift = true
         }
       }
     }
@@ -385,7 +382,7 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 
     // If all addons match their target version, mark installation as complete
     log.Info("addons","chartdrift",chartDrift)
-    if chartDrift == 0 { 
+    if chartDrift { 
       in.Status.SetState(v1beta1.InstallationStateInstalled,"Addons upgraded")
       return nil
     }

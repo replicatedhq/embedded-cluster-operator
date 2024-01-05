@@ -13,17 +13,31 @@ func TestMergeValues(t *testing.T) {
   password: "foo"
   someField: "asdf"
   other: "text"
+  overridden: "abcxyz"
+  nested:
+    nested:
+       protect: "testval"
   `
 	newData := `
   someField: "newstring"
   other: "text"
+  overridden: "this is new"
+  nested:
+    nested:
+      newkey: "newval"
+      protect: "newval"
   `
-	protect := []string{"password"}
+	protect := []string{"password", "overridden", "nested.nested.protect"}
 
 	targetData := `
   password: "foo"
   someField: "newstring"
+  nested:
+    nested:
+      newkey: "newval"
+      protect: "testval"
   other: "text"
+  overridden: "abcxyz"
   `
 
 	mergedValues, err := MergeValues(oldData, newData, protect)

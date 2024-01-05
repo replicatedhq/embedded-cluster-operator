@@ -303,22 +303,6 @@ func MergeValues(oldValues, newValues string, protectedValues []string) (string,
 
 }
 
-func checkAllNodesReady(r *InstallationReconciler, ctx context.Context) (bool, error) {
-	var nodes corev1.NodeList
-	if err := r.List(ctx, &nodes); err != nil {
-		return false, fmt.Errorf("failed to list nodes: %w", err)
-	}
-	for _, node := range nodes.Items {
-		for _, condition := range node.Status.Conditions {
-			fmt.Printf("\t%s: %s\n", condition.Type, condition.Status)
-			if condition.Type == "Ready" && condition.Status == "False" || condition.Status == "Unknown" {
-				return false, nil
-			}
-		}
-	}
-	return true, nil
-}
-
 // ReconcileHelmCharts reconciles the helm charts from the Installation metadata with the clusterconfig object.
 func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1beta1.Installation) error {
   log := ctrl.LoggerFrom(ctx)
@@ -639,7 +623,7 @@ func (r *InstallationReconciler) Reconcile(ctx context.Context, req ctrl.Request
   }
 	if err := r.Status().Update(ctx, in); err != nil {
 		if errors.IsConflict(err) {
-			return ctrl.Result{}, fmt.Errorf("failed to update status: conflict.")
+			return ctrl.Result{}, fmt.Errorf("failed to update status: conflict")
 		}
 		return ctrl.Result{}, fmt.Errorf("failed to update installation status: %w", err)
 	}

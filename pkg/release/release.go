@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	metaURL = "https://replicated.app/embedded-cluster-public-files/metadata/v%s.json"
+	metaURL = "%s/embedded-cluster-public-files/metadata/v%s.json"
 	cache   = map[string]*Meta{}
 	mutex   = sync.Mutex{}
 )
@@ -39,14 +39,14 @@ type Meta struct {
 }
 
 // MetadataFor reads metadata for a given release. Goes to replicated.app and reads release metadata file
-func MetadataFor(ctx context.Context, version string) (*Meta, error) {
+func MetadataFor(ctx context.Context, version string, upstream string) (*Meta, error) {
 	mutex.Lock()
 	defer mutex.Unlock()
 	version = strings.TrimPrefix(version, "v")
 	if meta, ok := cache[version]; ok {
 		return meta, nil
 	}
-	url := fmt.Sprintf(metaURL, version)
+	url := fmt.Sprintf(metaURL, version, upstream)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)

@@ -201,7 +201,7 @@ func (r *InstallationReconciler) ReconcileK0sVersion(ctx context.Context, in *v1
 		in.Status.SetState(v1beta1.InstallationStateKubernetesInstalled, "")
 		return nil
 	}
-	meta, err := release.MetadataFor(ctx, in.Spec.Config.Version)
+	meta, err := release.MetadataFor(ctx, in.Spec.Config.Version, in.Spec.MetricsBaseURL)
 	if err != nil {
 		in.Status.SetState(v1beta1.InstallationStateFailed, err.Error())
 		return nil
@@ -315,7 +315,7 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 		}
 		return nil
 	}
-	meta, err := release.MetadataFor(ctx, in.Spec.Config.Version)
+	meta, err := release.MetadataFor(ctx, in.Spec.Config.Version, in.Spec.MetricsBaseURL)
 	if err != nil {
 		return fmt.Errorf("failed to get release bundle: %w", err)
 	}
@@ -475,12 +475,13 @@ func (r *InstallationReconciler) StartUpgrade(ctx context.Context, in *v1beta1.I
 	if err != nil {
 		return fmt.Errorf("failed to determine upgrade targets: %w", err)
 	}
-	meta, err := release.MetadataFor(ctx, in.Spec.Config.Version)
+	meta, err := release.MetadataFor(ctx, in.Spec.Config.Version, in.Spec.MetricsBaseURL)
 	if err != nil {
 		return fmt.Errorf("failed to get release bundle: %w", err)
 	}
+
 	k0surl := fmt.Sprintf(
-		"https://replicated.app/embedded-cluster-public-files/k0s-binaries/%s", meta.Versions.Kubernetes,
+		"%s/embedded-cluster-public-files/k0s-binaries/%s", in.Spec.MetricsBaseURL, meta.Versions.Kubernetes,
 	)
 	plan := apv1b2.Plan{
 		ObjectMeta: metav1.ObjectMeta{

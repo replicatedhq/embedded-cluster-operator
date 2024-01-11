@@ -15,9 +15,9 @@ import (
 )
 
 var (
-	ghurl = "https://github.com/replicatedhq/embedded-cluster/releases/download/v%s/metadata.json"
-	cache = map[string]*Meta{}
-	mutex = sync.Mutex{}
+	metaURL = "https://replicated.app/embedded-cluster-public-files/metadata/v%s.json"
+	cache   = map[string]*Meta{}
+	mutex   = sync.Mutex{}
 )
 
 // Versions holds a list of add-on versions.
@@ -32,15 +32,13 @@ type Versions struct {
 // Meta represents the components of a given embedded cluster release. This
 // is read directly from GitHub releases page.
 type Meta struct {
-	Versions     Versions
-	K0sSHA       string
-	K0sBinaryURL string
-	Configs      *k0sv1beta1.HelmExtensions
-	Protected    map[string][]string
+	Versions  Versions
+	K0sSHA    string
+	Configs   *k0sv1beta1.HelmExtensions
+	Protected map[string][]string
 }
 
-// MetadataFor reads metadata for a given release. Goes to GitHub releases page
-// and reads metadata.json file.
+// MetadataFor reads metadata for a given release. Goes to replicated.app and reads release metadata file
 func MetadataFor(ctx context.Context, version string) (*Meta, error) {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -48,7 +46,7 @@ func MetadataFor(ctx context.Context, version string) (*Meta, error) {
 	if meta, ok := cache[version]; ok {
 		return meta, nil
 	}
-	url := fmt.Sprintf(ghurl, version)
+	url := fmt.Sprintf(metaURL, version)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)

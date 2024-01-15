@@ -312,9 +312,9 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 		return nil
 	}
 
-  if in.Status.State == v1beta1.InstallationStateFailed {
-    return nil
-  }
+	if in.Status.State == v1beta1.InstallationStateFailed {
+		return nil
+	}
 
 	log := ctrl.LoggerFrom(ctx)
 	var clusterconfig k0sv1beta1.ClusterConfig

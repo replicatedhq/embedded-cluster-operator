@@ -324,17 +324,35 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 		return nil
 	}
 	// skip if the new release has no addon configs
-	if meta.Configs == nil {
+	if meta.Configs == nil && in.Spec.Config.Extensions.Helm == nil {
 		log.Info("addons", "configcheck", "no addons")
 		if in.Status.State == v1beta1.InstallationStateKubernetesInstalled {
 			in.Status.SetState(v1beta1.InstallationStateInstalled, "Installed")
 		}
 		return nil
 	}
+
+	// merge default helm charts (from meta.Configs) with vendor helm charts (from in.Spec.Config.Extensions.Helm)
+	combinedConfigs := &k0sv1beta1.HelmExtensions{ConcurrencyLevel: 1}
+	if meta.Configs != nil {
+		combinedConfigs = meta.Configs
+	}
+	if in.Spec.Config.Extensions.Helm != nil {
+		// set the concurrency level to the minimum of our default and the user provided value
+		if in.Spec.Config.Extensions.Helm.ConcurrencyLevel > 0 {
+			combinedConfigs.ConcurrencyLevel = min(in.Spec.Config.Extensions.Helm.ConcurrencyLevel, combinedConfigs.ConcurrencyLevel)
+		}
+
+		// append the user provided charts to the default charts
+		combinedConfigs.Charts = append(combinedConfigs.Charts, in.Spec.Config.Extensions.Helm.Charts...)
+		// append the user provided repositories to the default repositories
+		combinedConfigs.Repositories = append(combinedConfigs.Repositories, in.Spec.Config.Extensions.Helm.Repositories...)
+	}
+
 	if in.Status.State == v1beta1.InstallationStateKubernetesInstalled || in.Status.State == v1beta1.InstallationStateHelmChartUpdateFailure {
 		var installedCharts k0shelm.ChartList
 		if err := r.List(ctx, &installedCharts); err != nil {
-			return fmt.Errorf("failed to list nodes: %w", err)
+			return fmt.Errorf("failed to list installed charts: %w", err)
 		}
 		targetCharts := meta.Configs.Charts
 		chartErrors := []string{}

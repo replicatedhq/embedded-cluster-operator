@@ -357,6 +357,9 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 		targetCharts := meta.Configs.Charts
 		chartErrors := []string{}
 		chartDrift := false
+		if len(installedCharts.Items) != len(targetCharts) { // if the desired numbers of charts are different, there is drift
+			chartDrift = true
+		}
 		// grab the installed charts
 		for _, chart := range installedCharts.Items {
 			// extract any errors from installed charts
@@ -364,26 +367,35 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 				chartErrors = append(chartErrors, chart.Status.Error)
 			}
 			// check for version drift between installed charts and charts in the installer metadata
+			chartSeen := false
 			for _, targetChart := range targetCharts {
 				if targetChart.Name != chart.Status.ReleaseName {
 					continue
 				}
+				chartSeen = true
 				if targetChart.Version != chart.Spec.Version {
 					chartDrift = true
 				}
+				if targetChart.Values != chart.Spec.Values {
+					chartDrift = true
+				}
+			}
+			if !chartSeen { // if this chart in the cluster is not in the target spec, there is drift
+				chartDrift = true
 			}
 		}
-		// If any chart has errors, update installer state and return
-		if len(chartErrors) > 0 {
-			chartErrorString := strings.Join(chartErrors, ",")
-			if len(chartErrorString) > 1024 {
-				chartErrorString = chartErrorString[:1024]
-			}
-			in.Status.SetState(v1beta1.InstallationStateHelmChartUpdateFailure, chartErrorString)
-			return nil
-		}
-		// If all addons match their target version, mark installation as complete
+		// If all addons match their target version, mark installation as complete (or as failed, if there are errors)
 		if !chartDrift {
+			// If any chart has errors, update installer state and return
+			if len(chartErrors) > 0 {
+				chartErrorString := strings.Join(chartErrors, ",")
+				chartErrorString = "failed to update helm charts: " + chartErrorString
+				if len(chartErrorString) > 1024 {
+					chartErrorString = chartErrorString[:1024]
+				}
+				in.Status.SetState(v1beta1.InstallationStateHelmChartUpdateFailure, chartErrorString)
+				return nil
+			}
 			in.Status.SetState(v1beta1.InstallationStateInstalled, "Addons upgraded")
 			return nil
 		}
@@ -393,7 +405,7 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 		return nil
 	}
 	// We want to skip and requeue if the k0s upgrade is still in progress
-	if in.Status.State != v1beta1.InstallationStateKubernetesInstalled {
+	if !in.Status.GetKubernetesInstalled() {
 		return nil
 	}
 	// fetch the current clusterconfig

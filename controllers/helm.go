@@ -79,7 +79,6 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 	}
 
 	log := ctrl.LoggerFrom(ctx)
-	var clusterconfig k0sv1beta1.ClusterConfig
 	meta, err := release.MetadataFor(ctx, in.Spec.Config.Version, in.Spec.MetricsBaseURL)
 	if err != nil {
 		in.Status.SetState(v1beta1.InstallationStateHelmChartUpdateFailure, err.Error())
@@ -133,6 +132,7 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 	}
 
 	// fetch the current clusterconfig
+	var clusterconfig k0sv1beta1.ClusterConfig
 	if err := r.Get(ctx, client.ObjectKey{Name: "k0s", Namespace: "kube-system"}, &clusterconfig); err != nil {
 		return fmt.Errorf("failed to get cluster config: %w", err)
 	}

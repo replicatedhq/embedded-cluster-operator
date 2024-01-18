@@ -74,7 +74,10 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 		return nil
 	}
 
-	if in.Status.State == v1beta1.InstallationStateFailed {
+	// skip if the installer has already completed, failed or if the k0s upgrade is still in progress
+	if in.Status.State == v1beta1.InstallationStateFailed ||
+		in.Status.State == v1beta1.InstallationStateInstalled ||
+		!in.Status.GetKubernetesInstalled() {
 		return nil
 	}
 
@@ -96,15 +99,6 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 	log.Info("reconciling helm charts", "defaultChartCount", len(meta.Configs.Charts), "customChartCount", len(in.Spec.Config.Extensions.Helm.Charts))
 
 	combinedConfigs := mergeHelmConfigs(meta, in)
-
-	// skip if installer is already complete
-	if in.Status.State == v1beta1.InstallationStateInstalled {
-		return nil
-	}
-	// We want to skip and requeue if the k0s upgrade is still in progress
-	if !in.Status.GetKubernetesInstalled() {
-		return nil
-	}
 
 	// detect drift between the cluster config and the installer metadata
 	var installedCharts k0shelm.ChartList
@@ -143,9 +137,8 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 	}
 
 	// Replace the current chart configs with the new chart configs
-	clusterconfig.Spec.Extensions.Helm.Charts = finalChartList
-	clusterconfig.Spec.Extensions.Helm.Repositories = combinedConfigs.Repositories
-	clusterconfig.Spec.Extensions.Helm.ConcurrencyLevel = combinedConfigs.ConcurrencyLevel
+	combinedConfigs.Charts = finalChartList
+	clusterconfig.Spec.Extensions.Helm = combinedConfigs
 	in.Status.SetState(v1beta1.InstallationStateAddonsInstalling, "Installing addons")
 	log.Info("updating charts in cluster config", "config spec", clusterconfig.Spec)
 	//Update the clusterconfig
@@ -158,10 +151,10 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 func mergeHelmConfigs(meta *release.Meta, in *v1beta1.Installation) *k0sv1beta1.HelmExtensions {
 	// merge default helm charts (from meta.Configs) with vendor helm charts (from in.Spec.Config.Extensions.Helm)
 	combinedConfigs := &k0sv1beta1.HelmExtensions{ConcurrencyLevel: 1}
-	if meta.Configs != nil {
+	if meta != nil && meta.Configs != nil {
 		combinedConfigs = meta.Configs
 	}
-	if in.Spec.Config.Extensions.Helm != nil {
+	if in != nil && in.Spec.Config != nil && in.Spec.Config.Extensions.Helm != nil {
 		// set the concurrency level to the minimum of our default and the user provided value
 		if in.Spec.Config.Extensions.Helm.ConcurrencyLevel > 0 {
 			combinedConfigs.ConcurrencyLevel = min(in.Spec.Config.Extensions.Helm.ConcurrencyLevel, combinedConfigs.ConcurrencyLevel)

@@ -332,6 +332,8 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 		return nil
 	}
 
+	log.Info("reconciling helm charts", "defaultChartCount", len(meta.Configs.Charts), "customChartCount", len(in.Spec.Config.Extensions.Helm.Charts))
+
 	// merge default helm charts (from meta.Configs) with vendor helm charts (from in.Spec.Config.Extensions.Helm)
 	combinedConfigs := &k0sv1beta1.HelmExtensions{ConcurrencyLevel: 1}
 	if meta.Configs != nil {
@@ -354,10 +356,11 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 		if err := r.List(ctx, &installedCharts); err != nil {
 			return fmt.Errorf("failed to list installed charts: %w", err)
 		}
-		targetCharts := meta.Configs.Charts
+		targetCharts := combinedConfigs.Charts
 		chartErrors := []string{}
 		chartDrift := false
 		if len(installedCharts.Items) != len(targetCharts) { // if the desired numbers of charts are different, there is drift
+			log.Info("numbers of charts differ")
 			chartDrift = true
 		}
 		// grab the installed charts
@@ -374,9 +377,7 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 				}
 				chartSeen = true
 				if targetChart.Version != chart.Spec.Version {
-					chartDrift = true
-				}
-				if targetChart.Values != chart.Spec.Values {
+					log.Info(fmt.Sprintf("chart %q version differs - %q != %q", targetChart.Name, targetChart.Version, chart.Spec.Version))
 					chartDrift = true
 				}
 			}
@@ -386,10 +387,12 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 		}
 		// If all addons match their target version, mark installation as complete (or as failed, if there are errors)
 		if !chartDrift {
+			log.Info("no chart drift")
 			// If any chart has errors, update installer state and return
 			if len(chartErrors) > 0 {
 				chartErrorString := strings.Join(chartErrors, ",")
 				chartErrorString = "failed to update helm charts: " + chartErrorString
+				log.Info("chart errors!", "errors", chartErrorString)
 				if len(chartErrorString) > 1024 {
 					chartErrorString = chartErrorString[:1024]
 				}
@@ -417,10 +420,12 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 	if meta.Protected != nil {
 		protectedValues = meta.Protected
 	}
+
 	// TODO - apply unsupported override from installation config
 	finalConfigs := k0sv1beta1.ChartsSettings{}
+	// include charts in the final spec that are already in the cluster (with merged values)
 	for _, chart := range clusterconfig.Spec.Extensions.Helm.Charts {
-		for _, newChart := range meta.Configs.Charts {
+		for _, newChart := range combinedConfigs.Charts {
 			// check if we can skip this chart
 			_, ok := protectedValues[chart.Name]
 			if chart.Name != newChart.Name || !ok {
@@ -436,9 +441,24 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 			break
 		}
 	}
+	// include new charts in the final spec that are not yet in the cluster
+	for _, newChart := range combinedConfigs.Charts {
+		chartExists := false
+		for _, existingChart := range clusterconfig.Spec.Extensions.Helm.Charts {
+			if existingChart.Name == newChart.Name {
+				chartExists = true
+				break
+			}
+		}
+		if !chartExists {
+			finalConfigs = append(finalConfigs, newChart)
+		}
+	}
+
 	// Replace the current chart configs with the new chart configs
 	clusterconfig.Spec.Extensions.Helm.Charts = finalConfigs
 	in.Status.SetState(v1beta1.InstallationStateAddonsInstalling, "Installing addons")
+	log.Info("updating charts in cluster config", "config spec", clusterconfig.Spec)
 	//Update the clusterconfig
 	if err := r.Update(ctx, &clusterconfig); err != nil {
 		return fmt.Errorf("failed to update cluster config: %w", err)

@@ -415,6 +415,7 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 	if err := r.Get(ctx, client.ObjectKey{Name: "k0s", Namespace: "kube-system"}, &clusterconfig); err != nil {
 		return fmt.Errorf("failed to get cluster config: %w", err)
 	}
+
 	// get the protected values from the release metadata
 	protectedValues := map[string][]string{}
 	if meta.Protected != nil {
@@ -422,7 +423,7 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 	}
 
 	// TODO - apply unsupported override from installation config
-	finalConfigs := k0sv1beta1.ChartsSettings{}
+	finalConfigs := map[string]k0sv1beta1.Chart{}
 	// include charts in the final spec that are already in the cluster (with merged values)
 	for _, chart := range clusterconfig.Spec.Extensions.Helm.Charts {
 		for _, newChart := range combinedConfigs.Charts {
@@ -437,26 +438,27 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 				return fmt.Errorf("failed to merge chart values: %w", err)
 			}
 			newChart.Values = newValuesYaml
-			finalConfigs = append(finalConfigs, newChart)
+			finalConfigs[newChart.Name] = newChart
 			break
 		}
 	}
 	// include new charts in the final spec that are not yet in the cluster
 	for _, newChart := range combinedConfigs.Charts {
-		chartExists := false
-		for _, existingChart := range clusterconfig.Spec.Extensions.Helm.Charts {
-			if existingChart.Name == newChart.Name {
-				chartExists = true
-				break
-			}
-		}
-		if !chartExists {
-			finalConfigs = append(finalConfigs, newChart)
+		if _, ok := finalConfigs[newChart.Name]; !ok {
+			finalConfigs[newChart.Name] = newChart
 		}
 	}
 
+	// flatten chart map
+	finalChartList := []k0sv1beta1.Chart{}
+	for _, chart := range finalConfigs {
+		finalChartList = append(finalChartList, chart)
+	}
+
 	// Replace the current chart configs with the new chart configs
-	clusterconfig.Spec.Extensions.Helm.Charts = finalConfigs
+	clusterconfig.Spec.Extensions.Helm.Charts = finalChartList
+	clusterconfig.Spec.Extensions.Helm.Repositories = combinedConfigs.Repositories
+	clusterconfig.Spec.Extensions.Helm.ConcurrencyLevel = combinedConfigs.ConcurrencyLevel
 	in.Status.SetState(v1beta1.InstallationStateAddonsInstalling, "Installing addons")
 	log.Info("updating charts in cluster config", "config spec", clusterconfig.Spec)
 	//Update the clusterconfig

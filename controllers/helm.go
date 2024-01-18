@@ -96,6 +96,66 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 
 	log.Info("reconciling helm charts", "defaultChartCount", len(meta.Configs.Charts), "customChartCount", len(in.Spec.Config.Extensions.Helm.Charts))
 
+	combinedConfigs := mergeHelmConfigs(meta, in)
+
+	// skip if installer is already complete
+	if in.Status.State == v1beta1.InstallationStateInstalled {
+		return nil
+	}
+	// We want to skip and requeue if the k0s upgrade is still in progress
+	if !in.Status.GetKubernetesInstalled() {
+		return nil
+	}
+
+	// detect drift between the cluster config and the installer metadata
+	var installedCharts k0shelm.ChartList
+	if err := r.List(ctx, &installedCharts); err != nil {
+		return fmt.Errorf("failed to list installed charts: %w", err)
+	}
+	chartErrors, chartDrift := detectChartDrift(ctx, combinedConfigs, installedCharts)
+
+	// If all addons match their target version, mark installation as complete (or as failed, if there are errors)
+	if !chartDrift {
+		log.Info("no chart drift")
+		// If any chart has errors, update installer state and return
+		if len(chartErrors) > 0 {
+			chartErrorString := strings.Join(chartErrors, ",")
+			chartErrorString = "failed to update helm charts: " + chartErrorString
+			log.Info("chart errors!", "errors", chartErrorString)
+			if len(chartErrorString) > 1024 {
+				chartErrorString = chartErrorString[:1024]
+			}
+			in.Status.SetState(v1beta1.InstallationStateHelmChartUpdateFailure, chartErrorString)
+			return nil
+		}
+		in.Status.SetState(v1beta1.InstallationStateInstalled, "Addons upgraded")
+		return nil
+	}
+
+	// fetch the current clusterconfig
+	if err := r.Get(ctx, client.ObjectKey{Name: "k0s", Namespace: "kube-system"}, &clusterconfig); err != nil {
+		return fmt.Errorf("failed to get cluster config: %w", err)
+	}
+
+	finalChartList, err := generateDesiredCharts(meta, clusterconfig, combinedConfigs)
+	if err != nil {
+		return err
+	}
+
+	// Replace the current chart configs with the new chart configs
+	clusterconfig.Spec.Extensions.Helm.Charts = finalChartList
+	clusterconfig.Spec.Extensions.Helm.Repositories = combinedConfigs.Repositories
+	clusterconfig.Spec.Extensions.Helm.ConcurrencyLevel = combinedConfigs.ConcurrencyLevel
+	in.Status.SetState(v1beta1.InstallationStateAddonsInstalling, "Installing addons")
+	log.Info("updating charts in cluster config", "config spec", clusterconfig.Spec)
+	//Update the clusterconfig
+	if err := r.Update(ctx, &clusterconfig); err != nil {
+		return fmt.Errorf("failed to update cluster config: %w", err)
+	}
+	return nil
+}
+
+func mergeHelmConfigs(meta *release.Meta, in *v1beta1.Installation) *k0sv1beta1.HelmExtensions {
 	// merge default helm charts (from meta.Configs) with vendor helm charts (from in.Spec.Config.Extensions.Helm)
 	combinedConfigs := &k0sv1beta1.HelmExtensions{ConcurrencyLevel: 1}
 	if meta.Configs != nil {
@@ -112,20 +172,12 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 		// append the user provided repositories to the default repositories
 		combinedConfigs.Repositories = append(combinedConfigs.Repositories, in.Spec.Config.Extensions.Helm.Repositories...)
 	}
-	// skip if installer is already complete
-	if in.Status.State == v1beta1.InstallationStateInstalled {
-		return nil
-	}
-	// We want to skip and requeue if the k0s upgrade is still in progress
-	if !in.Status.GetKubernetesInstalled() {
-		return nil
-	}
+	return combinedConfigs
+}
 
-	// detect drift between the cluster config and the installer metadata
-	var installedCharts k0shelm.ChartList
-	if err := r.List(ctx, &installedCharts); err != nil {
-		return fmt.Errorf("failed to list installed charts: %w", err)
-	}
+func detectChartDrift(ctx context.Context, combinedConfigs *k0sv1beta1.HelmExtensions, installedCharts k0shelm.ChartList) ([]string, bool) {
+	log := ctrl.LoggerFrom(ctx)
+
 	targetCharts := combinedConfigs.Charts
 	chartErrors := []string{}
 	chartDrift := false
@@ -155,29 +207,10 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 			chartDrift = true
 		}
 	}
-	// If all addons match their target version, mark installation as complete (or as failed, if there are errors)
-	if !chartDrift {
-		log.Info("no chart drift")
-		// If any chart has errors, update installer state and return
-		if len(chartErrors) > 0 {
-			chartErrorString := strings.Join(chartErrors, ",")
-			chartErrorString = "failed to update helm charts: " + chartErrorString
-			log.Info("chart errors!", "errors", chartErrorString)
-			if len(chartErrorString) > 1024 {
-				chartErrorString = chartErrorString[:1024]
-			}
-			in.Status.SetState(v1beta1.InstallationStateHelmChartUpdateFailure, chartErrorString)
-			return nil
-		}
-		in.Status.SetState(v1beta1.InstallationStateInstalled, "Addons upgraded")
-		return nil
-	}
+	return chartErrors, chartDrift
+}
 
-	// fetch the current clusterconfig
-	if err := r.Get(ctx, client.ObjectKey{Name: "k0s", Namespace: "kube-system"}, &clusterconfig); err != nil {
-		return fmt.Errorf("failed to get cluster config: %w", err)
-	}
-
+func generateDesiredCharts(meta *release.Meta, clusterconfig k0sv1beta1.ClusterConfig, combinedConfigs *k0sv1beta1.HelmExtensions) ([]k0sv1beta1.Chart, error) {
 	// get the protected values from the release metadata
 	protectedValues := map[string][]string{}
 	if meta.Protected != nil {
@@ -197,7 +230,7 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 			// if we have known fields, we need to merge them forward
 			newValuesYaml, err := MergeValues(chart.Values, newChart.Values, protectedValues[chart.Name])
 			if err != nil {
-				return fmt.Errorf("failed to merge chart values: %w", err)
+				return nil, fmt.Errorf("failed to merge chart values: %w", err)
 			}
 			newChart.Values = newValuesYaml
 			finalConfigs[newChart.Name] = newChart
@@ -216,16 +249,5 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 	for _, chart := range finalConfigs {
 		finalChartList = append(finalChartList, chart)
 	}
-
-	// Replace the current chart configs with the new chart configs
-	clusterconfig.Spec.Extensions.Helm.Charts = finalChartList
-	clusterconfig.Spec.Extensions.Helm.Repositories = combinedConfigs.Repositories
-	clusterconfig.Spec.Extensions.Helm.ConcurrencyLevel = combinedConfigs.ConcurrencyLevel
-	in.Status.SetState(v1beta1.InstallationStateAddonsInstalling, "Installing addons")
-	log.Info("updating charts in cluster config", "config spec", clusterconfig.Spec)
-	//Update the clusterconfig
-	if err := r.Update(ctx, &clusterconfig); err != nil {
-		return fmt.Errorf("failed to update cluster config: %w", err)
-	}
-	return nil
+	return finalChartList, nil
 }

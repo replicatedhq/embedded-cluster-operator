@@ -459,3 +459,101 @@ func Test_detectChartDrift(t *testing.T) {
 		})
 	}
 }
+
+func Test_generateDesiredCharts(t *testing.T) {
+	type args struct {
+		meta            *release.Meta
+		clusterconfig   k0sv1beta1.ClusterConfig
+		combinedConfigs *k0sv1beta1.HelmExtensions
+	}
+	tests := []struct {
+		name string
+		args args
+		want []k0sv1beta1.Chart
+	}{
+		{
+			name: "no meta/configs",
+			args: args{
+				meta: nil,
+				clusterconfig: k0sv1beta1.ClusterConfig{
+					Spec: &k0sv1beta1.ClusterSpec{
+						Extensions: &k0sv1beta1.ClusterExtensions{
+							Helm: &k0sv1beta1.HelmExtensions{},
+						},
+					},
+				},
+				combinedConfigs: &k0sv1beta1.HelmExtensions{},
+			},
+			want: []k0sv1beta1.Chart{},
+		},
+		{
+			name: "add new chart, change chart values, change chart version, remove old chart",
+			args: args{
+				meta: &release.Meta{
+					Protected: map[string][]string{
+						"changethis": {"abc"},
+					},
+				},
+				clusterconfig: k0sv1beta1.ClusterConfig{
+					Spec: &k0sv1beta1.ClusterSpec{
+						Extensions: &k0sv1beta1.ClusterExtensions{
+							Helm: &k0sv1beta1.HelmExtensions{
+								Charts: []k0sv1beta1.Chart{
+									{
+										Name: "removethis",
+									},
+									{
+										Name:   "changethis",
+										Values: "abc: xyz",
+									},
+									{
+										Name:    "newversion",
+										Version: "1.0.0",
+									},
+								},
+							},
+						},
+					},
+				},
+				combinedConfigs: &k0sv1beta1.HelmExtensions{
+					Charts: []k0sv1beta1.Chart{
+						{
+							Name:   "addthis",
+							Values: "addedval: xyz",
+						},
+						{
+							Name:   "changethis",
+							Values: "key2: val2",
+						},
+						{
+							Name:    "newversion",
+							Version: "2.0.0",
+						},
+					},
+				},
+			},
+			want: []k0sv1beta1.Chart{
+				{
+					Name:   "addthis",
+					Values: "addedval: xyz",
+				},
+				{
+					Name:   "changethis",
+					Values: "abc: xyz\nkey2: val2\n",
+				},
+				{
+					Name:    "newversion",
+					Version: "2.0.0",
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := require.New(t)
+			got, err := generateDesiredCharts(tt.args.meta, tt.args.clusterconfig, tt.args.combinedConfigs)
+			req.NoError(err)
+			req.ElementsMatch(tt.want, got)
+		})
+	}
+}

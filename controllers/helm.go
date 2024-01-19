@@ -211,7 +211,7 @@ func detectChartDrift(ctx context.Context, combinedConfigs *k0sv1beta1.HelmExten
 func generateDesiredCharts(meta *release.Meta, clusterconfig k0sv1beta1.ClusterConfig, combinedConfigs *k0sv1beta1.HelmExtensions) ([]k0sv1beta1.Chart, error) {
 	// get the protected values from the release metadata
 	protectedValues := map[string][]string{}
-	if meta.Protected != nil {
+	if meta != nil && meta.Protected != nil {
 		protectedValues = meta.Protected
 	}
 

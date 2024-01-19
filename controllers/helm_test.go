@@ -10,12 +10,20 @@ import (
 	"github.com/replicatedhq/embedded-cluster-operator/api/v1beta1"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/release"
 	"github.com/stretchr/testify/require"
-	"gotest.tools/v3/assert"
 	"sigs.k8s.io/yaml"
 )
 
-func TestMergeValues(t *testing.T) {
-	oldData := `
+func Test_mergeValues(t *testing.T) {
+	tests := []struct {
+		name            string
+		oldValues       string
+		newValues       string
+		protectedValues []string
+		want            string
+	}{
+		{
+			name: "combined test",
+			oldValues: `
   password: "foo"
   someField: "asdf"
   other: "text"
@@ -23,8 +31,8 @@ func TestMergeValues(t *testing.T) {
   nested:
     nested:
        protect: "testval"
-  `
-	newData := `
+`,
+			newValues: `
   someField: "newstring"
   other: "text"
   overridden: "this is new"
@@ -32,10 +40,9 @@ func TestMergeValues(t *testing.T) {
     nested:
       newkey: "newval"
       protect: "newval"
-  `
-	protect := []string{"password", "overridden", "nested.nested.protect"}
-
-	targetData := `
+`,
+			protectedValues: []string{"password", "overridden", "nested.nested.protect"},
+			want: `
   password: "foo"
   someField: "newstring"
   nested:
@@ -44,25 +51,63 @@ func TestMergeValues(t *testing.T) {
       protect: "testval"
   other: "text"
   overridden: "abcxyz"
-  `
-
-	mergedValues, err := MergeValues(oldData, newData, protect)
-	if err != nil {
-		t.Fail()
+`,
+		},
+		{
+			name:      "empty old values",
+			oldValues: ``,
+			newValues: `
+  someField: "newstring"
+  other: "text"
+  overridden: "this is new"
+  nested:
+    nested:
+      newkey: "newval"
+      protect: "newval"
+`,
+			protectedValues: []string{"password", "overridden", "nested.nested.protect"},
+			want: `
+  someField: "newstring"
+  overridden: "this is new"
+  nested:
+    nested:
+      newkey: "newval"
+      protect: "newval"
+  other: "text"
+`,
+		},
+		{
+			name: "no protected values",
+			oldValues: `
+	  password: "foo"
+	  someField: "asdf"
+`,
+			newValues: `
+password: "newpassword"
+`,
+			protectedValues: []string{},
+			want: `
+password: "newpassword"
+`,
+		},
 	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := require.New(t)
+			got, err := MergeValues(tt.oldValues, tt.newValues, tt.protectedValues)
+			req.NoError(err)
 
-	targetDataMap := dig.Mapping{}
-	if err := yaml.Unmarshal([]byte(targetData), &targetDataMap); err != nil {
-		t.Fail()
+			targetDataMap := dig.Mapping{}
+			err = yaml.Unmarshal([]byte(tt.want), &targetDataMap)
+			req.NoError(err)
+
+			mergedDataMap := dig.Mapping{}
+			err = yaml.Unmarshal([]byte(got), &mergedDataMap)
+			req.NoError(err)
+
+			req.Equal(targetDataMap, mergedDataMap)
+		})
 	}
-
-	mergedDataMap := dig.Mapping{}
-	if err := yaml.Unmarshal([]byte(mergedValues), &mergedDataMap); err != nil {
-		t.Fail()
-	}
-
-	assert.DeepEqual(t, targetDataMap, mergedDataMap)
-
 }
 
 func Test_mergeHelmConfigs(t *testing.T) {

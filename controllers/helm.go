@@ -148,6 +148,7 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 	return nil
 }
 
+// merge the default helm charts and repositories (from meta.Configs) with vendor helm charts (from in.Spec.Config.Extensions.Helm)
 func mergeHelmConfigs(meta *release.Meta, in *v1beta1.Installation) *k0sv1beta1.HelmExtensions {
 	// merge default helm charts (from meta.Configs) with vendor helm charts (from in.Spec.Config.Extensions.Helm)
 	combinedConfigs := &k0sv1beta1.HelmExtensions{ConcurrencyLevel: 1}
@@ -168,6 +169,8 @@ func mergeHelmConfigs(meta *release.Meta, in *v1beta1.Installation) *k0sv1beta1.
 	return combinedConfigs
 }
 
+// detect if the charts currently installed in the cluster (installedCharts) match the desired charts (combinedConfigs)
+// also detect if any of the charts installed in the cluster contain error messages
 func detectChartDrift(ctx context.Context, combinedConfigs *k0sv1beta1.HelmExtensions, installedCharts k0shelm.ChartList) ([]string, bool) {
 	log := ctrl.LoggerFrom(ctx)
 
@@ -203,6 +206,8 @@ func detectChartDrift(ctx context.Context, combinedConfigs *k0sv1beta1.HelmExten
 	return chartErrors, chartDrift
 }
 
+// merge the helmcharts in the cluster with the charts we desire to be in the cluster
+// if the chart is already in the cluster, merge the values
 func generateDesiredCharts(meta *release.Meta, clusterconfig k0sv1beta1.ClusterConfig, combinedConfigs *k0sv1beta1.HelmExtensions) ([]k0sv1beta1.Chart, error) {
 	// get the protected values from the release metadata
 	protectedValues := map[string][]string{}

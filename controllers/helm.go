@@ -87,7 +87,8 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 		in.Status.SetState(v1beta1.InstallationStateHelmChartUpdateFailure, err.Error())
 		return nil
 	}
-	// skip if the new release has no addon configs
+
+	// skip if the new release has no addon configs - this should not happen in production
 	if meta.Configs == nil && in.Spec.Config.Extensions.Helm == nil {
 		log.Info("addons", "configcheck", "no addons")
 		if in.Status.State == v1beta1.InstallationStateKubernetesInstalled {
@@ -96,8 +97,6 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 		return nil
 	}
 
-	log.Info("reconciling helm charts", "defaultChartCount", len(meta.Configs.Charts), "customChartCount", len(in.Spec.Config.Extensions.Helm.Charts))
-
 	combinedConfigs := mergeHelmConfigs(meta, in)
 
 	// detect drift between the cluster config and the installer metadata
@@ -105,16 +104,15 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 	if err := r.List(ctx, &installedCharts); err != nil {
 		return fmt.Errorf("failed to list installed charts: %w", err)
 	}
-	chartErrors, chartDrift := detectChartDrift(ctx, combinedConfigs, installedCharts)
+	chartErrors, chartDrift := detectChartDrift(combinedConfigs, installedCharts)
 
 	// If all addons match their target version, mark installation as complete (or as failed, if there are errors)
 	if !chartDrift {
-		log.Info("no chart drift")
 		// If any chart has errors, update installer state and return
 		if len(chartErrors) > 0 {
 			chartErrorString := strings.Join(chartErrors, ",")
 			chartErrorString = "failed to update helm charts: " + chartErrorString
-			log.Info("chart errors!", "errors", chartErrorString)
+			log.Info("chart errors", "errors", chartErrorString)
 			if len(chartErrorString) > 1024 {
 				chartErrorString = chartErrorString[:1024]
 			}
@@ -140,7 +138,6 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 	combinedConfigs.Charts = finalChartList
 	clusterconfig.Spec.Extensions.Helm = combinedConfigs
 	in.Status.SetState(v1beta1.InstallationStateAddonsInstalling, "Installing addons")
-	log.Info("updating charts in cluster config", "config spec", clusterconfig.Spec)
 	//Update the clusterconfig
 	if err := r.Update(ctx, &clusterconfig); err != nil {
 		return fmt.Errorf("failed to update cluster config: %w", err)
@@ -171,14 +168,11 @@ func mergeHelmConfigs(meta *release.Meta, in *v1beta1.Installation) *k0sv1beta1.
 
 // detect if the charts currently installed in the cluster (installedCharts) match the desired charts (combinedConfigs)
 // also detect if any of the charts installed in the cluster contain error messages
-func detectChartDrift(ctx context.Context, combinedConfigs *k0sv1beta1.HelmExtensions, installedCharts k0shelm.ChartList) ([]string, bool) {
-	log := ctrl.LoggerFrom(ctx)
-
+func detectChartDrift(combinedConfigs *k0sv1beta1.HelmExtensions, installedCharts k0shelm.ChartList) ([]string, bool) {
 	targetCharts := combinedConfigs.Charts
 	chartErrors := []string{}
 	chartDrift := false
 	if len(installedCharts.Items) != len(targetCharts) { // if the desired numbers of charts are different, there is drift
-		log.Info("numbers of charts differ", "installed", installedCharts.Items, "target", targetCharts)
 		chartDrift = true
 	}
 	// grab the installed charts
@@ -195,7 +189,6 @@ func detectChartDrift(ctx context.Context, combinedConfigs *k0sv1beta1.HelmExten
 			}
 			chartSeen = true
 			if targetChart.Version != chart.Spec.Version {
-				log.Info(fmt.Sprintf("chart %q version differs - %q != %q", targetChart.Name, targetChart.Version, chart.Spec.Version))
 				chartDrift = true
 			}
 		}

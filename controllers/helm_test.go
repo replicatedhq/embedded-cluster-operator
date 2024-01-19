@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"context"
 	"testing"
 
 	"github.com/k0sproject/dig"
@@ -452,8 +451,7 @@ func Test_detectChartDrift(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req := require.New(t)
 
-			ctx := context.Background()
-			gotErrors, gotDrift := detectChartDrift(ctx, tt.args.combinedConfigs, tt.args.installedCharts)
+			gotErrors, gotDrift := detectChartDrift(tt.args.combinedConfigs, tt.args.installedCharts)
 			req.Equal(tt.wantChartErrors, gotErrors)
 			req.Equal(tt.wantDrift, gotDrift)
 		})

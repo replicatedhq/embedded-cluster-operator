@@ -310,6 +310,12 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 		return nil
 	}
 
+	if in.Status.State != v1beta1.InstallationStateKubernetesInstalled {
+		// after the first time we apply new helm charts, this will be set to InstallationStateAddonsInstalling
+		// and we will not re-apply the charts to the k0s cluster config while waiting for those changes to propagate
+		return nil
+	}
+
 	// fetch the current clusterconfig
 	var clusterconfig k0sv1beta1.ClusterConfig
 	if err := r.Get(ctx, client.ObjectKey{Name: "k0s", Namespace: "kube-system"}, &clusterconfig); err != nil {

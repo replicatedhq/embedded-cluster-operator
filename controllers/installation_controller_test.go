@@ -115,6 +115,59 @@ func TestInstallationReconciler_ReconcileHelmCharts(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "k8s install completed, good version, both types of charts, chart errors",
+			in: v1beta1.Installation{
+				Status: v1beta1.InstallationStatus{State: v1beta1.InstallationStateKubernetesInstalled},
+				Spec: v1beta1.InstallationSpec{
+					Config: &v1beta1.ConfigSpec{
+						Version: "goodver",
+						Extensions: v1beta1.Extensions{
+							Helm: &k0sv1beta1.HelmExtensions{
+								Charts: []k0sv1beta1.Chart{
+									{
+										Name:    "extchart",
+										Version: "2",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			out: v1beta1.InstallationStatus{
+				State:  v1beta1.InstallationStateHelmChartUpdateFailure,
+				Reason: "failed to update helm charts: exterror,metaerror",
+			},
+			releaseMeta: release.Meta{
+				Configs: &k0sv1beta1.HelmExtensions{
+					Charts: []k0sv1beta1.Chart{
+						{
+							Name:    "metachart",
+							Version: "1",
+						},
+					},
+				},
+			},
+			fields: fields{
+				State: []runtime.Object{
+					&k0shelmv1beta1.Chart{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "metachart",
+						},
+						Spec:   k0shelmv1beta1.ChartSpec{ChartName: "metachart"},
+						Status: k0shelmv1beta1.ChartStatus{Version: "1", Error: "metaerror"},
+					},
+					&k0shelmv1beta1.Chart{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "extchart",
+						},
+						Spec:   k0shelmv1beta1.ChartSpec{ChartName: "extchart"},
+						Status: k0shelmv1beta1.ChartStatus{Version: "2", Error: "exterror"},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 

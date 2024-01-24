@@ -10,6 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/discovery"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"testing"
 )
@@ -26,6 +27,7 @@ func TestInstallationReconciler_ReconcileHelmCharts(t *testing.T) {
 		in          v1beta1.Installation
 		out         v1beta1.InstallationStatus
 		releaseMeta release.Meta
+		updatedHelm *k0sv1beta1.HelmExtensions
 	}{
 		{
 			name: "no input config, move to installed",
@@ -168,6 +170,105 @@ func TestInstallationReconciler_ReconcileHelmCharts(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "k8s install completed, good version, both types of charts, drift, addons already installing",
+			in: v1beta1.Installation{
+				Status: v1beta1.InstallationStatus{State: v1beta1.InstallationStateAddonsInstalling},
+				Spec: v1beta1.InstallationSpec{
+					Config: &v1beta1.ConfigSpec{
+						Version: "goodver",
+						Extensions: v1beta1.Extensions{
+							Helm: &k0sv1beta1.HelmExtensions{
+								Charts: []k0sv1beta1.Chart{
+									{
+										Name:    "extchart",
+										Version: "2",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			out: v1beta1.InstallationStatus{
+				State: v1beta1.InstallationStateAddonsInstalling,
+			},
+			releaseMeta: release.Meta{
+				Configs: &k0sv1beta1.HelmExtensions{
+					Charts: []k0sv1beta1.Chart{
+						{
+							Name:    "metachart",
+							Version: "1",
+						},
+					},
+				},
+			},
+			fields: fields{
+				State: []runtime.Object{},
+			},
+		},
+		{
+			name: "k8s install completed, good version, both types of charts, drift",
+			in: v1beta1.Installation{
+				Status: v1beta1.InstallationStatus{State: v1beta1.InstallationStateKubernetesInstalled},
+				Spec: v1beta1.InstallationSpec{
+					Config: &v1beta1.ConfigSpec{
+						Version: "goodver",
+						Extensions: v1beta1.Extensions{
+							Helm: &k0sv1beta1.HelmExtensions{
+								Charts: []k0sv1beta1.Chart{
+									{
+										Name:    "extchart",
+										Version: "2",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			out: v1beta1.InstallationStatus{
+				State:  v1beta1.InstallationStateAddonsInstalling,
+				Reason: "Installing addons",
+			},
+			releaseMeta: release.Meta{
+				Configs: &k0sv1beta1.HelmExtensions{
+					Charts: []k0sv1beta1.Chart{
+						{
+							Name:    "metachart",
+							Version: "1",
+						},
+					},
+				},
+			},
+			fields: fields{
+				State: []runtime.Object{
+					&k0sv1beta1.ClusterConfig{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "k0s",
+							Namespace: "kube-system",
+						},
+						Spec: &k0sv1beta1.ClusterSpec{
+							Extensions: &k0sv1beta1.ClusterExtensions{
+								Helm: &k0sv1beta1.HelmExtensions{},
+							},
+						},
+					},
+				},
+			},
+			updatedHelm: &k0sv1beta1.HelmExtensions{
+				Charts: []k0sv1beta1.Chart{
+					{
+						Name:    "metachart",
+						Version: "1",
+					},
+					{
+						Name:    "extchart",
+						Version: "2",
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 
@@ -178,6 +279,7 @@ func TestInstallationReconciler_ReconcileHelmCharts(t *testing.T) {
 
 			sch, err := k0shelmv1beta1.SchemeBuilder.Build()
 			req.NoError(err)
+			req.NoError(k0sv1beta1.AddToScheme(sch))
 			fakeCli := fake.NewClientBuilder().WithScheme(sch).WithRuntimeObjects(tt.fields.State...).Build()
 
 			r := &InstallationReconciler{
@@ -188,6 +290,13 @@ func TestInstallationReconciler_ReconcileHelmCharts(t *testing.T) {
 			err = r.ReconcileHelmCharts(context.Background(), &tt.in)
 			req.NoError(err)
 			req.Equal(tt.out, tt.in.Status)
+
+			if tt.updatedHelm != nil {
+				var gotCluster k0sv1beta1.ClusterConfig
+				err = fakeCli.Get(context.Background(), client.ObjectKey{Name: "k0s", Namespace: "kube-system"}, &gotCluster)
+				req.NoError(err)
+				req.Equal(*tt.updatedHelm, *gotCluster.Spec.Extensions.Helm)
+			}
 		})
 	}
 }

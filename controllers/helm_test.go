@@ -383,11 +383,11 @@ func Test_detectChartDrift(t *testing.T) {
 					Items: []k0shelm.Chart{
 						{
 							Status: k0shelm.ChartStatus{
-								Error: "test chart error",
+								Error:   "test chart error",
+								Version: "1.0.0",
 							},
 							Spec: k0shelm.ChartSpec{
 								ChartName: "test",
-								Version:   "1.0.0",
 							},
 						},
 						{

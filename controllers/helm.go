@@ -113,13 +113,13 @@ func detectChartDrift(combinedConfigs *k0sv1beta1.HelmExtensions, installedChart
 			targetValuesMap := map[string]interface{}{}
 			err := yaml.Unmarshal([]byte(targetChart.Values), &targetValuesMap)
 			if err != nil {
-				return nil, false, fmt.Errorf("target chart %s values error: %w", targetChart.Name)
+				return nil, false, fmt.Errorf("target chart %s values error: %w", targetChart.Name, err)
 			}
 
 			currentValuesMap := map[string]interface{}{}
 			err = yaml.Unmarshal([]byte(chart.Spec.Values), &currentValuesMap)
 			if err != nil {
-				return nil, false, fmt.Errorf("existing chart %s values error: %w", chart.Spec.ReleaseName)
+				return nil, false, fmt.Errorf("existing chart %s values error: %w", chart.Spec.ReleaseName, err)
 			}
 
 			if !reflect.DeepEqual(targetValuesMap, currentValuesMap) {

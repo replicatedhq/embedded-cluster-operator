@@ -97,7 +97,7 @@ func detectChartDrift(combinedConfigs *k0sv1beta1.HelmExtensions, installedChart
 		// check for version drift between installed charts and charts in the installer metadata
 		chartSeen := false
 		for _, targetChart := range targetCharts {
-			if targetChart.Name != chart.Spec.ChartName {
+			if targetChart.Name != chart.Spec.ReleaseName {
 				continue
 			}
 			chartSeen = true

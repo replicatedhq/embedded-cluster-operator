@@ -292,7 +292,6 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 		return fmt.Errorf("failed to list installed charts: %w", err)
 	}
 	chartErrors, chartDrift := detectChartDrift(combinedConfigs, installedCharts)
-	fmt.Printf("------- chart drift: %t --------\n", chartDrift)
 
 	// If any chart has errors, update installer state and return
 	if len(chartErrors) > 0 {

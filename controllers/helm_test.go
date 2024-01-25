@@ -485,9 +485,7 @@ func Test_detectChartDrift(t *testing.T) {
 			req := require.New(t)
 
 			gotErrors, gotDrift, err := detectChartDrift(tt.args.combinedConfigs, tt.args.installedCharts)
-			if err != nil {
-				t.Fatal(err)
-			}
+			req.NoError(err)
 			req.Equal(tt.wantChartErrors, gotErrors)
 			req.Equal(tt.wantDrift, gotDrift)
 		})

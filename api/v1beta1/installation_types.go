@@ -24,6 +24,7 @@ import (
 const (
 	InstallationStateWaiting                string = "Waiting"
 	InstallationStateEnqueued               string = "Enqueued"
+	InstallationStatePreparing              string = "Preparing"
 	InstallationStateInstalling             string = "Installing"
 	InstallationStateInstalled              string = "Installed"
 	InstallationStateKubernetesInstalled    string = "KubernetesInstalled"

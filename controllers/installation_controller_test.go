@@ -115,6 +115,17 @@ func TestInstallationReconciler_ReconcileHelmCharts(t *testing.T) {
 						Spec:   k0shelmv1beta1.ChartSpec{ReleaseName: "extchart"},
 						Status: k0shelmv1beta1.ChartStatus{Version: "2"},
 					},
+					&k0sv1beta1.ClusterConfig{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "k0s",
+							Namespace: "kube-system",
+						},
+						Spec: &k0sv1beta1.ClusterSpec{
+							Extensions: &k0sv1beta1.ClusterExtensions{
+								Helm: &k0sv1beta1.HelmExtensions{},
+							},
+						},
+					},
 				},
 			},
 		},
@@ -168,6 +179,17 @@ func TestInstallationReconciler_ReconcileHelmCharts(t *testing.T) {
 						Spec:   k0shelmv1beta1.ChartSpec{ReleaseName: "extchart"},
 						Status: k0shelmv1beta1.ChartStatus{Version: "2", Error: "exterror"},
 					},
+					&k0sv1beta1.ClusterConfig{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "k0s",
+							Namespace: "kube-system",
+						},
+						Spec: &k0sv1beta1.ClusterSpec{
+							Extensions: &k0sv1beta1.ClusterExtensions{
+								Helm: &k0sv1beta1.HelmExtensions{},
+							},
+						},
+					},
 				},
 			},
 		},
@@ -205,7 +227,19 @@ func TestInstallationReconciler_ReconcileHelmCharts(t *testing.T) {
 				},
 			},
 			fields: fields{
-				State: []runtime.Object{},
+				State: []runtime.Object{
+					&k0sv1beta1.ClusterConfig{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "k0s",
+							Namespace: "kube-system",
+						},
+						Spec: &k0sv1beta1.ClusterSpec{
+							Extensions: &k0sv1beta1.ClusterExtensions{
+								Helm: &k0sv1beta1.HelmExtensions{},
+							},
+						},
+					},
+				},
 			},
 		},
 		{

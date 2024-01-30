@@ -286,12 +286,6 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 
 	combinedConfigs := mergeHelmConfigs(meta, in)
 
-	// detect drift between the cluster config and the installer metadata
-	var installedCharts k0shelm.ChartList
-	if err := r.List(ctx, &installedCharts); err != nil {
-		return fmt.Errorf("failed to list installed charts: %w", err)
-	}
-
 	// fetch the current clusterconfig
 	var clusterconfig k0sv1beta1.ClusterConfig
 	if err := r.Get(ctx, client.ObjectKey{Name: "k0s", Namespace: "kube-system"}, &clusterconfig); err != nil {
@@ -303,6 +297,12 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 		return err
 	}
 	combinedConfigs.Charts = finalChartList
+
+	// detect drift between the cluster config and the installer metadata
+	var installedCharts k0shelm.ChartList
+	if err := r.List(ctx, &installedCharts); err != nil {
+		return fmt.Errorf("failed to list installed charts: %w", err)
+	}
 
 	chartErrors, chartDrift, err := detectChartDrift(combinedConfigs, installedCharts)
 	if err != nil {

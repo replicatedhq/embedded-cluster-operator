@@ -341,11 +341,11 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 	// this avoids a race condition where k0s will attempt to install the charts before the secret is created
 	return nil
 
-	//Update the clusterconfig
-	if err := r.Update(ctx, &clusterconfig); err != nil {
-		return fmt.Errorf("failed to update cluster config: %w", err)
-	}
-	return nil
+	////Update the clusterconfig
+	//if err := r.Update(ctx, &clusterconfig); err != nil {
+	//	return fmt.Errorf("failed to update cluster config: %w", err)
+	//}
+	//return nil
 }
 
 // SetStateBasedOnPlan sets the installation state based on the Plan state. For now we do not

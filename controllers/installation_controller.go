@@ -333,6 +333,10 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 		return nil
 	}
 
+	// TODO check if the helm-created secret is present before applying the charts
+	// this avoids a race condition where k0s will attempt to install the charts before the secret is created
+	time.Sleep(time.Second * 30)
+
 	// Replace the current chart configs with the new chart configs
 	clusterconfig.Spec.Extensions.Helm = combinedConfigs
 	in.Status.SetState(v1beta1.InstallationStateAddonsInstalling, "Installing addons")

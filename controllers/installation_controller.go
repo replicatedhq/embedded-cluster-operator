@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -29,9 +30,10 @@ import (
 	apcore "github.com/k0sproject/k0s/pkg/autopilot/controller/plans/core"
 	"github.com/k0sproject/version"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -43,10 +45,15 @@ import (
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/release"
 )
 
-// requeueAfter is our default interval for requeueing. If nothing has changed with the
-// cluster nodes or the Installation object we will reconcile once every requeueAfter
-// interval.
-var requeueAfter = time.Hour
+var (
+	// requeueAfter is our default interval for requeueing. If nothing has changed with the
+	// cluster nodes or the Installation object we will reconcile once every requeueAfter
+	// interval.
+	requeueAfter = time.Hour
+	// ErrNoDesiredVersion indicates that no embedded cluster version was specified in the
+	// cluster configuration.
+	ErrNoDesiredVersion = fmt.Errorf("no desired version found")
+)
 
 // NodeEventsBatch is a batch of node events, meant to be gathered at a given
 // moment in time and send later on to the metrics server.
@@ -188,67 +195,89 @@ func (r *InstallationReconciler) ReportInstallationChanges(ctx context.Context, 
 	}
 }
 
+// Versions returns the current version (as read from the embedded cluster config config map) and the
+// desired version (as read from the installation spec). Returns ErrNoDesiredVersion if no version is
+// specified in the installation spec.
+func (r *InstallationReconciler) Versions(ctx context.Context, in *v1beta1.Installation) (*version.Version, *version.Version, error) {
+	log := ctrl.LoggerFrom(ctx)
+	log.Info("Assessing cluster and installation versions")
+	if in.Spec.Config == nil || in.Spec.Config.Version == "" {
+		return nil, nil, ErrNoDesiredVersion
+	}
+	nsn := types.NamespacedName{Name: "embedded-cluster-config", Namespace: "embedded-cluster"}
+	var eccfg corev1.ConfigMap
+	if err := r.Get(ctx, nsn, &eccfg); err != nil {
+		return nil, nil, fmt.Errorf("failed to get embedded cluster config: %w", err)
+	}
+	rawCurrent, ok := eccfg.Data["embedded-cluster-version"]
+	if !ok || rawCurrent == "" {
+		return nil, nil, fmt.Errorf("no current version found")
+	}
+	current, err := version.NewVersion(rawCurrent)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to parse current version: %w", err)
+	}
+	desired, err := version.NewVersion(in.Spec.Config.Version)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to parse desired version: %w", err)
+	}
+	log.Info("Versions parsed", "current", current.String(), "desired", desired.String())
+	return current, desired, nil
+}
+
 // ReconcileK0sVersion reconciles the k0s version in the Installation object status. If the
 // Installation spec.config points to a different version we start an upgrade Plan. If an
 // upgrade plan already exists we make sure the installation status is updated with the
 // latest plan status.
 func (r *InstallationReconciler) ReconcileK0sVersion(ctx context.Context, in *v1beta1.Installation) error {
-	if in.Spec.Config == nil || in.Spec.Config.Version == "" {
+	log := ctrl.LoggerFrom(ctx)
+	current, desired, err := r.Versions(ctx, in)
+	if err != nil {
+		if !errors.Is(err, ErrNoDesiredVersion) {
+			return fmt.Errorf("failed to assess versions: %w", err)
+		}
+		log.Info("No desired version specified, not reconciling k0s version")
 		in.Status.SetState(v1beta1.InstallationStateKubernetesInstalled, "")
 		return nil
 	}
-	meta, err := release.MetadataFor(ctx, in.Spec.Config.Version, in.Spec.MetricsBaseURL)
-	if err != nil {
-		in.Status.SetState(v1beta1.InstallationStateFailed, err.Error())
-		return nil
-	}
-	vinfo, err := r.Discovery.ServerVersion()
-	if err != nil {
-		return fmt.Errorf("failed to get server version: %w", err)
-	}
-	runningVersion := vinfo.GitVersion
-	if runningVersion == meta.Versions.Kubernetes {
+	if current.Equal(desired) {
+		log.Info("Current and desired versions are equal")
 		in.Status.SetState(v1beta1.InstallationStateKubernetesInstalled, "")
 		return nil
 	}
-	running, err := version.NewVersion(runningVersion)
-	if err != nil {
-		reason := fmt.Sprintf("Invalid running version %s", runningVersion)
-		in.Status.SetState(v1beta1.InstallationStateFailed, reason)
-		return nil
-	}
-	desired, err := version.NewVersion(meta.Versions.Kubernetes)
-	if err != nil {
-		reason := fmt.Sprintf("Invalid desired version %s", in.Spec.Config.Version)
-		in.Status.SetState(v1beta1.InstallationStateFailed, reason)
-		return nil
-	}
-	if running.GreaterThan(desired) {
+	if current.GreaterThan(desired) {
+		log.Info("Downgrade detected, not supported")
 		in.Status.SetState(v1beta1.InstallationStateFailed, "Downgrades not supported")
 		return nil
 	}
+	log.Info("An upgrade is required, verifying if an upgrade plan exists")
 	var plan apv1b2.Plan
 	okey := client.ObjectKey{Name: "autopilot"}
-	if err := r.Get(ctx, okey, &plan); err != nil && !errors.IsNotFound(err) {
+	if err := r.Get(ctx, okey, &plan); err != nil && !kerrors.IsNotFound(err) {
 		return fmt.Errorf("failed to get upgrade plan: %w", err)
-	} else if errors.IsNotFound(err) {
+	} else if kerrors.IsNotFound(err) {
+		log.Info("No upgrade plan detected, starting one")
 		if err := r.StartUpgrade(ctx, in); err != nil {
 			return fmt.Errorf("failed to start upgrade: %w", err)
 		}
 		return nil
 	}
 	if plan.Spec.ID == in.Name {
+		log.Info("Upgrade plan found, setting status based on it")
 		r.SetStateBasedOnPlan(in, plan)
 		return nil
 	}
 	if !autopilot.HasThePlanEnded(plan) {
+		log.Info("Old upgrade plan found, waiting for it to finish")
 		reason := fmt.Sprintf("Another upgrade is in progress (%s)", plan.Spec.ID)
 		in.Status.SetState(v1beta1.InstallationStateWaiting, reason)
 		return nil
 	}
+	log.Info("Deleting old and finished upgrade plan")
 	if err := r.Delete(ctx, &plan); err != nil {
 		return fmt.Errorf("failed to delete previous upgrade plan: %w", err)
 	}
+	in.Status.SetState(v1beta1.InstallationStatePreparing, "")
 	return nil
 }
 
@@ -277,7 +306,7 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 
 	// skip if the new release has no addon configs - this should not happen in production
 	if meta.Configs == nil && in.Spec.Config.Extensions.Helm == nil {
-		log.Info("addons", "configcheck", "no addons")
+		log.Info("Addons", "configcheck", "no addons")
 		if in.Status.State == v1beta1.InstallationStateKubernetesInstalled {
 			in.Status.SetState(v1beta1.InstallationStateInstalled, "Installed")
 		}
@@ -313,7 +342,7 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 	if len(chartErrors) > 0 {
 		chartErrorString := strings.Join(chartErrors, ",")
 		chartErrorString = "failed to update helm charts: " + chartErrorString
-		log.Info("chart errors", "errors", chartErrorString)
+		log.Info("Found chart errors", "errors", chartErrorString)
 		if len(chartErrorString) > 1024 {
 			chartErrorString = chartErrorString[:1024]
 		}
@@ -418,7 +447,6 @@ func (r *InstallationReconciler) StartUpgrade(ctx context.Context, in *v1beta1.I
 	if err != nil {
 		return fmt.Errorf("failed to get release bundle: %w", err)
 	}
-
 	k0surl := fmt.Sprintf(
 		"%s/embedded-cluster-public-files/k0s-binaries/%s", in.Spec.MetricsBaseURL, meta.Versions.Kubernetes,
 	)
@@ -490,6 +518,7 @@ func (r *InstallationReconciler) DisableOldInstallations(ctx context.Context, it
 }
 
 //+kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch
+//+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch
 //+kubebuilder:rbac:groups=embeddedcluster.replicated.com,resources=installations,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=embeddedcluster.replicated.com,resources=installations/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=embeddedcluster.replicated.com,resources=installations/finalizers,verbs=update
@@ -526,6 +555,7 @@ func (r *InstallationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to reconcile node status: %w", err)
 	}
+	log.Info("Reconciling k0s version")
 	if err := r.ReconcileK0sVersion(ctx, in); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to reconcile k0s version: %w", err)
 	}
@@ -534,7 +564,7 @@ func (r *InstallationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, fmt.Errorf("failed to reconcile helm charts: %w", err)
 	}
 	if err := r.Status().Update(ctx, in); err != nil {
-		if errors.IsConflict(err) {
+		if kerrors.IsConflict(err) {
 			return ctrl.Result{}, fmt.Errorf("failed to update status: conflict")
 		}
 		return ctrl.Result{}, fmt.Errorf("failed to update installation status: %w", err)

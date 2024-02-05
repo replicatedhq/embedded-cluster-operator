@@ -369,6 +369,18 @@ spec:
               metricsBaseURL:
                 description: MetricsBaseURL holds the base URL for the metrics server.
                 type: string
+              proxyConfig:
+                description: ProxyConfig holds the proxy configuration used at installation time.
+                properties:
+                  httpProxy:
+                    type: string
+                  httpsProxy:
+                    type: string
+                  noProxy:
+                    items:
+                      type: string
+                    type: array
+                type: object
             required:
             - airGap
             type: object

@@ -56,6 +56,17 @@ type InstallationSpec struct {
 	// EndUserK0sConfigOverrides holds the end user k0s config overrides
 	// used at installation time.
 	EndUserK0sConfigOverrides string `json:"endUserK0sConfigOverrides,omitempty"`
+	// ProxyConfig holds the proxy configuration used at installation time.
+	ProxyConfig *ProxyConfig `json:"proxyConfig,omitempty"`
+}
+
+// ProxyConfig holds the proxy configuration used at installation time. This is
+// kept at the cluster level so we can use the same config when joining new nodes
+// to the cluster.
+type ProxyConfig struct {
+	HTTPProxy  string   `json:"httpProxy,omitempty"`
+	HTTPSProxy string   `json:"httpsProxy,omitempty"`
+	NoProxy    []string `json:"noProxy,omitempty"`
 }
 
 // InstallationStatus defines the observed state of Installation

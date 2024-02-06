@@ -430,7 +430,7 @@ password: original`,
 								Charts: []k0sv1beta1.Chart{
 									{
 										Name:    "extchart",
-										Version: "2",
+										Version: "3",
 									},
 								},
 							},
@@ -505,6 +505,21 @@ password: original`,
 					},
 				},
 			},
+			updatedHelm: &k0sv1beta1.HelmExtensions{
+				Charts: []k0sv1beta1.Chart{
+					{
+						Name:    "metachart",
+						Version: "1",
+						Values: `abc: xyz
+password: original
+`,
+					},
+					{
+						Name:    "extchart",
+						Version: "3",
+					},
+				},
+			},
 		},
 		{
 			name: "k8s install completed, values drift but chart not yet installed",
@@ -561,6 +576,15 @@ password: original`,
 								},
 							},
 						},
+					},
+				},
+			},
+			updatedHelm: &k0sv1beta1.HelmExtensions{
+				Charts: []k0sv1beta1.Chart{
+					{
+						Name:    "metachart",
+						Version: "1",
+						Values:  `abc: original`,
 					},
 				},
 			},

@@ -345,6 +345,16 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 	if err := r.Update(ctx, &clusterconfig); err != nil {
 		return fmt.Errorf("failed to update cluster config: %w", err)
 	}
+
+	log.Info(fmt.Sprintf("Updated clusterconfig with charts %+v", combinedConfigs.Charts))
+
+	var afterUpdate k0sv1beta1.ClusterConfig
+	if err := r.Get(ctx, client.ObjectKey{Name: "k0s", Namespace: "kube-system"}, &afterUpdate); err != nil {
+		return fmt.Errorf("failed to get cluster config after update: %w", err)
+	}
+
+	log.Info(fmt.Sprintf("Clusterconfig after update %+v", afterUpdate.Spec.Extensions.Helm.Charts))
+
 	return nil
 }
 

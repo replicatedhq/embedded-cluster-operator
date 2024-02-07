@@ -177,7 +177,7 @@ func TestInstallationReconciler_ReconcileHelmCharts(t *testing.T) {
 			},
 			out: v1beta1.InstallationStatus{
 				State:  v1beta1.InstallationStateHelmChartUpdateFailure,
-				Reason: "failed to update helm charts: metaerror,exterror",
+				Reason: "failed to update helm charts: exterror",
 			},
 			releaseMeta: release.Meta{
 				Configs: &k0sv1beta1.HelmExtensions{
@@ -195,8 +195,7 @@ func TestInstallationReconciler_ReconcileHelmCharts(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "metachart",
 						},
-						Spec:   k0shelmv1beta1.ChartSpec{ReleaseName: "metachart"},
-						Status: k0shelmv1beta1.ChartStatus{Version: "1", Error: "metaerror"},
+						Spec: k0shelmv1beta1.ChartSpec{ReleaseName: "metachart"},
 					},
 					&k0shelmv1beta1.Chart{
 						ObjectMeta: metav1.ObjectMeta{
@@ -221,6 +220,60 @@ func TestInstallationReconciler_ReconcileHelmCharts(t *testing.T) {
 										{
 											Name:    "extchart",
 											Version: "2",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "k8s install completed, good version, releaseMeta chart, chart errors",
+			in: v1beta1.Installation{
+				Status: v1beta1.InstallationStatus{State: v1beta1.InstallationStateKubernetesInstalled},
+				Spec: v1beta1.InstallationSpec{
+					Config: &v1beta1.ConfigSpec{
+						Version: "goodver",
+					},
+				},
+			},
+			out: v1beta1.InstallationStatus{
+				State:  v1beta1.InstallationStateHelmChartUpdateFailure,
+				Reason: "failed to update helm charts: metaerror",
+			},
+			releaseMeta: release.Meta{
+				Configs: &k0sv1beta1.HelmExtensions{
+					Charts: []k0sv1beta1.Chart{
+						{
+							Name:    "metachart",
+							Version: "1",
+						},
+					},
+				},
+			},
+			fields: fields{
+				State: []runtime.Object{
+					&k0shelmv1beta1.Chart{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "metachart",
+						},
+						Spec:   k0shelmv1beta1.ChartSpec{ReleaseName: "metachart"},
+						Status: k0shelmv1beta1.ChartStatus{Version: "1", Error: "metaerror"},
+					},
+					&k0sv1beta1.ClusterConfig{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "k0s",
+							Namespace: "kube-system",
+						},
+						Spec: &k0sv1beta1.ClusterSpec{
+							Extensions: &k0sv1beta1.ClusterExtensions{
+								Helm: &k0sv1beta1.HelmExtensions{
+									Charts: []k0sv1beta1.Chart{
+										{
+											Name:    "metachart",
+											Version: "1",
 										},
 									},
 								},

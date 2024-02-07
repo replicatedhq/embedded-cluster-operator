@@ -842,3 +842,39 @@ func Test_detectChartDrift(t *testing.T) {
 		})
 	}
 }
+
+func Test_yamlDiff(t *testing.T) {
+	tests := []struct {
+		name string
+		a    string
+		b    string
+		want bool
+	}{
+		{
+			name: "comments",
+			a:    "abc: xyz",
+			b:    "abc: xyz # with a comment",
+			want: false,
+		},
+		{
+			name: "order",
+			a:    "abc: xyz\nkey2: val2",
+			b:    "key2: val2\nabc: xyz",
+			want: false,
+		},
+		{
+			name: "different values",
+			a:    "abc: xyz",
+			b:    "abc: newvalue",
+			want: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := require.New(t)
+			got, err := yamlDiff(tt.a, tt.b)
+			req.NoError(err)
+			req.Equal(tt.want, got)
+		})
+	}
+}

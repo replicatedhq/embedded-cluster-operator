@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"context"
 	"testing"
 
 	"github.com/k0sproject/dig"
@@ -484,7 +485,7 @@ func Test_detectChartCompletion(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req := require.New(t)
 
-			gotIncomplete, gotErrors, err := detectChartCompletion(tt.args.combinedConfigs, tt.args.installedCharts)
+			gotIncomplete, gotErrors, err := detectChartCompletion(context.Background(), tt.args.combinedConfigs, tt.args.installedCharts)
 			req.NoError(err)
 			req.Equal(tt.wantChartErrors, gotErrors)
 			req.Equal(tt.wantIncompleteCharts, gotIncomplete)
@@ -732,7 +733,7 @@ func Test_detectChartDrift2(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := require.New(t)
-			got, charterrs, err := detectChartCompletion(tt.configCharts, tt.charts)
+			got, charterrs, err := detectChartCompletion(context.Background(), tt.configCharts, tt.charts)
 			req.NoError(err)
 			req.Empty(charterrs)
 			req.ElementsMatch(tt.want, got)
@@ -843,7 +844,7 @@ func Test_detectChartDrift(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := require.New(t)
-			got, err := detectChartDrift(tt.combinedConfigs, tt.currentConfigs)
+			got, err := detectChartDrift(context.Background(), tt.combinedConfigs, tt.currentConfigs)
 			req.NoError(err)
 			req.Equal(tt.want, got)
 		})

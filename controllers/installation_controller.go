@@ -303,7 +303,7 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 		existingHelm = clusterConfig.Spec.Extensions.Helm
 	}
 
-	chartDrift, err := detectChartDrift(combinedConfigs, existingHelm)
+	chartDrift, err := detectChartDrift(ctx, combinedConfigs, existingHelm)
 	if err != nil {
 		return fmt.Errorf("failed to check chart drift: %w", err)
 	}
@@ -313,7 +313,7 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 	if err := r.List(ctx, &installedCharts); err != nil {
 		return fmt.Errorf("failed to list installed charts: %w", err)
 	}
-	pendingCharts, chartErrors, err := detectChartCompletion(existingHelm, installedCharts)
+	pendingCharts, chartErrors, err := detectChartCompletion(ctx, existingHelm, installedCharts)
 	if err != nil {
 		return fmt.Errorf("failed to check chart completion: %w", err)
 	}

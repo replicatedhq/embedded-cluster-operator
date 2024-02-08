@@ -506,6 +506,7 @@ password: original`,
 									{
 										Name:    "extchart",
 										Version: "2",
+										Values:  "abc: xyz",
 									},
 								},
 							},
@@ -577,6 +578,22 @@ password: original`,
 								},
 							},
 						},
+					},
+				},
+			},
+			updatedHelm: &k0sv1beta1.HelmExtensions{
+				Charts: []k0sv1beta1.Chart{
+					{
+						Name:    "metachart",
+						Version: "1",
+						Values: `abc: xyz
+password: original
+`,
+					},
+					{
+						Name:    "extchart",
+						Version: "2",
+						Values:  "abc: xyz",
 					},
 				},
 			},

@@ -76,9 +76,6 @@ func CacheMeta(version string, meta Meta) {
 
 // metaFromCache returns a version from the cache, but without any pointers that might update things still in the cache.
 func metaFromCache(version string) (*Meta, error) {
-	mutex.Lock()
-	defer mutex.Unlock()
-
 	// take the cached version and turn it into json
 	meta := cache[version]
 	if meta == nil {

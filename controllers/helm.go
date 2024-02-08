@@ -78,6 +78,13 @@ func mergeHelmConfigs(meta *release.Meta, in *v1beta1.Installation) *k0sv1beta1.
 		// append the user provided repositories to the default repositories
 		combinedConfigs.Repositories = append(combinedConfigs.Repositories, in.Spec.Config.Extensions.Helm.Repositories...)
 	}
+
+	for _, chart := range combinedConfigs.Charts {
+		if chart.Name == "ingress-nginx" {
+			fmt.Printf("\nnginx chart, combined: %v\n", chart)
+		}
+	}
+
 	return combinedConfigs
 }
 
@@ -238,7 +245,7 @@ func generateDesiredCharts(meta *release.Meta, clusterconfig k0sv1beta1.ClusterC
 	}
 
 	if nginxChart, ok := finalConfigs["ingress-nginx"]; ok {
-		fmt.Printf("\nnginx chart: %v\n", nginxChart)
+		fmt.Printf("\nnginx chart, postvaluesmerge: %v\n", nginxChart)
 	}
 
 	// flatten chart map

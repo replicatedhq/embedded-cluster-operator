@@ -215,7 +215,7 @@ func generateDesiredCharts(meta *release.Meta, clusterconfig k0sv1beta1.ClusterC
 				continue
 			}
 
-			if chart.Name == "ingress-nginx" {
+			if newChart.Name == "ingress-nginx" {
 				fmt.Printf("\nnginx chart, prevaluesmerge: %v\n", newChart2)
 			}
 

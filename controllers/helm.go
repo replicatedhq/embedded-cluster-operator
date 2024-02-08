@@ -232,6 +232,10 @@ func generateDesiredCharts(meta *release.Meta, clusterconfig k0sv1beta1.ClusterC
 		}
 	}
 
+	if nginxChart, ok := finalConfigs["ingress-nginx"]; ok {
+		fmt.Printf("nginx chart: %v\n", nginxChart)
+	}
+
 	// flatten chart map
 	finalChartList := []k0sv1beta1.Chart{}
 	for _, chart := range finalConfigs {

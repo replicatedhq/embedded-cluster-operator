@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"context"
 	"fmt"
 	"github.com/k0sproject/dig"
 	k0shelm "github.com/k0sproject/k0s/pkg/apis/helm/v1beta1"
@@ -83,10 +82,9 @@ func mergeHelmConfigs(meta *release.Meta, in *v1beta1.Installation) *k0sv1beta1.
 }
 
 // detect if the charts currently installed in the cluster (currentConfigs) match the desired charts (combinedConfigs)
-func detectChartDrift(ctx context.Context, combinedConfigs, currentConfigs *k0sv1beta1.HelmExtensions) (bool, error) {
-	if len(currentConfigs.Charts) != len(combinedConfigs.Charts) ||
-		len(currentConfigs.Repositories) != len(combinedConfigs.Repositories) {
-		fmt.Printf("chart count drift detected: installed %d desired %d charts, %d desired %d installed repos\n", len(currentConfigs.Charts), len(combinedConfigs.Charts), len(currentConfigs.Repositories), len(combinedConfigs.Repositories))
+func detectChartDrift(combinedConfigs, currentConfigs *k0sv1beta1.HelmExtensions) (bool, error) {
+	if len(currentConfigs.Charts) != len(combinedConfigs.Charts) {
+		fmt.Printf("chart count drift detected: installed %d desired %d charts\n", len(currentConfigs.Charts), len(combinedConfigs.Charts))
 		return true, nil
 	}
 
@@ -152,7 +150,7 @@ func yamlDiff(a, b string) (bool, error) {
 }
 
 // check if all charts in the combinedConfigs are installed successfully with the desired version and values
-func detectChartCompletion(ctx context.Context, combinedConfigs *k0sv1beta1.HelmExtensions, installedCharts k0shelm.ChartList) ([]string, []string, error) {
+func detectChartCompletion(combinedConfigs *k0sv1beta1.HelmExtensions, installedCharts k0shelm.ChartList) ([]string, []string, error) {
 	incompleteCharts := []string{}
 	chartErrors := []string{}
 	if combinedConfigs == nil {

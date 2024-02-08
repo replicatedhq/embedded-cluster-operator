@@ -356,6 +356,8 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 		return nil
 	}
 
+	log.Info("updating cluster config with new helm charts", combinedConfigs)
+
 	// Replace the current chart configs with the new chart configs
 	clusterConfig.Spec.Extensions.Helm = combinedConfigs
 	in.Status.SetState(v1beta1.InstallationStateAddonsInstalling, "Installing addons")

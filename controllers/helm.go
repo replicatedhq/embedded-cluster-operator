@@ -8,7 +8,6 @@ import (
 	k0sv1beta1 "github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
 	"github.com/ohler55/ojg/jp"
 	"github.com/ohler55/ojg/oj"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/yaml"
 
 	"github.com/replicatedhq/embedded-cluster-operator/api/v1beta1"
@@ -85,7 +84,6 @@ func mergeHelmConfigs(meta *release.Meta, in *v1beta1.Installation) *k0sv1beta1.
 
 // detect if the charts currently installed in the cluster (currentConfigs) match the desired charts (combinedConfigs)
 func detectChartDrift(ctx context.Context, combinedConfigs, currentConfigs *k0sv1beta1.HelmExtensions) (bool, error) {
-	log := ctrl.LoggerFrom(ctx)
 	if len(currentConfigs.Charts) != len(combinedConfigs.Charts) ||
 		len(currentConfigs.Repositories) != len(combinedConfigs.Repositories) {
 		return true, nil
@@ -105,7 +103,7 @@ func detectChartDrift(ctx context.Context, combinedConfigs, currentConfigs *k0sv
 
 			if targetChart.Version != chart.Version {
 				chartDrift = true
-				log.Info("chart version drift detected", "chart", chart.Name, "installed", chart.Version, "desired", targetChart.Version)
+				fmt.Printf("chart version drift detected: chart %s installed %s desired %s\n", chart.Name, chart.Version, targetChart.Version)
 			}
 
 			valuesDiff, err := yamlDiff(targetChart.Values, chart.Values)
@@ -114,12 +112,12 @@ func detectChartDrift(ctx context.Context, combinedConfigs, currentConfigs *k0sv
 			}
 			if valuesDiff {
 				chartDrift = true
-				log.Info("chart values drift detected", "chart", chart.Name, "installed", chart.Values, "desired", targetChart.Values)
+				fmt.Printf("chart values drift detected: chart %s installed %s desired %s\n", chart.Name, chart.Values, targetChart.Values)
 			}
 		}
 		if !chartSeen { // if this chart in the cluster is not in the target spec, there is drift
 			chartDrift = true
-			log.Info("chart not found in desired spec", "chart", chart.Name)
+			fmt.Printf("chart not found in desired spec: chart %s\n", chart.Name)
 		}
 	}
 	return chartDrift, nil
@@ -154,7 +152,6 @@ func yamlDiff(a, b string) (bool, error) {
 
 // check if all charts in the combinedConfigs are installed successfully with the desired version and values
 func detectChartCompletion(ctx context.Context, combinedConfigs *k0sv1beta1.HelmExtensions, installedCharts k0shelm.ChartList) ([]string, []string, error) {
-	log := ctrl.LoggerFrom(ctx)
 	incompleteCharts := []string{}
 	chartErrors := []string{}
 	if combinedConfigs == nil {
@@ -173,12 +170,12 @@ func detectChartCompletion(ctx context.Context, combinedConfigs *k0sv1beta1.Helm
 				}
 				if valuesDiff {
 					diffDetected = true
-					log.Info("chart values drift detected", "chart", chart.Name, "installed", installedChart.Spec.Values, "desired", chart.Values)
+					fmt.Printf("chart values drift detected: chart %s installed %s desired %s\n", chart.Name, installedChart.Spec.Values, chart.Values)
 				}
 
 				if installedChart.Status.Version != chart.Version {
 					diffDetected = true
-					log.Info("chart version drift detected", "chart", chart.Name, "installed", installedChart.Status.Version, "desired", chart.Version)
+					fmt.Printf("chart version drift detected: chart %s installed %s desired %s\n", chart.Name, installedChart.Status.Version, chart.Version)
 				}
 
 				if installedChart.Status.Error != "" {
@@ -191,7 +188,7 @@ func detectChartCompletion(ctx context.Context, combinedConfigs *k0sv1beta1.Helm
 		}
 		if !chartSeen || diffDetected {
 			incompleteCharts = append(incompleteCharts, chart.Name)
-			log.Info("chart not found in desired spec", "chart", chart.Name)
+			fmt.Printf("chart not found in desired spec: chart %s\n", chart.Name)
 		}
 	}
 

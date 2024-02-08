@@ -66,11 +66,23 @@ func mergeHelmConfigs(meta *release.Meta, in *v1beta1.Installation) *k0sv1beta1.
 	combinedConfigs := &k0sv1beta1.HelmExtensions{ConcurrencyLevel: 1}
 	if meta != nil && meta.Configs != nil {
 		combinedConfigs = meta.Configs
+		for _, chart := range meta.Configs.Charts {
+			if chart.Name == "ingress-nginx" {
+				fmt.Printf("\nnginx chart, meta: %v\n", chart)
+			}
+		}
 	}
+
 	if in != nil && in.Spec.Config != nil && in.Spec.Config.Extensions.Helm != nil {
 		// set the concurrency level to the minimum of our default and the user provided value
 		if in.Spec.Config.Extensions.Helm.ConcurrencyLevel > 0 {
 			combinedConfigs.ConcurrencyLevel = min(in.Spec.Config.Extensions.Helm.ConcurrencyLevel, combinedConfigs.ConcurrencyLevel)
+		}
+
+		for _, chart := range in.Spec.Config.Extensions.Helm.Charts {
+			if chart.Name == "ingress-nginx" {
+				fmt.Printf("\nnginx chart, input: %v\n", chart)
+			}
 		}
 
 		// append the user provided charts to the default charts

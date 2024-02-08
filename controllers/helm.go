@@ -214,6 +214,11 @@ func generateDesiredCharts(meta *release.Meta, clusterconfig k0sv1beta1.ClusterC
 			if chart.Name != newChart.Name || !ok {
 				continue
 			}
+
+			if chart.Name == "ingress-nginx" {
+				fmt.Printf("\nnginx chart, prevaluesmerge: %v\n", newChart2)
+			}
+
 			// if we have known fields, we need to merge them forward
 			newValuesYaml, err := MergeValues(chart.Values, newChart.Values, protectedValues[chart.Name])
 			if err != nil {

@@ -86,6 +86,7 @@ func mergeHelmConfigs(meta *release.Meta, in *v1beta1.Installation) *k0sv1beta1.
 func detectChartDrift(ctx context.Context, combinedConfigs, currentConfigs *k0sv1beta1.HelmExtensions) (bool, error) {
 	if len(currentConfigs.Charts) != len(combinedConfigs.Charts) ||
 		len(currentConfigs.Repositories) != len(combinedConfigs.Repositories) {
+		fmt.Printf("chart count drift detected: installed %d desired %d charts, %d desired %d installed repos\n", len(currentConfigs.Charts), len(combinedConfigs.Charts), len(currentConfigs.Repositories), len(combinedConfigs.Repositories))
 		return true, nil
 	}
 

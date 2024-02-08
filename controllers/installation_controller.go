@@ -308,6 +308,8 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 		return fmt.Errorf("failed to check chart drift: %w", err)
 	}
 
+	fmt.Printf("detected chart drift: %t\n", chartDrift)
+
 	// detect drift between the cluster config and the installer metadata
 	var installedCharts k0shelm.ChartList
 	if err := r.List(ctx, &installedCharts); err != nil {
@@ -317,6 +319,8 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 	if err != nil {
 		return fmt.Errorf("failed to check chart completion: %w", err)
 	}
+
+	fmt.Printf("detected pending charts: %+v\n", pendingCharts)
 
 	// If any chart has errors, update installer state and return
 	// if there is a difference between what we want and what we have
@@ -356,7 +360,7 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 		return nil
 	}
 
-	fmt.Printf("updating cluster config with new helm charts - drift %b: %+v", chartDrift, combinedConfigs)
+	fmt.Printf("updating cluster config with new helm charts: %+v", combinedConfigs)
 
 	// Replace the current chart configs with the new chart configs
 	clusterConfig.Spec.Extensions.Helm = combinedConfigs

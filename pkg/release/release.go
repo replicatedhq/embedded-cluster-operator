@@ -43,8 +43,8 @@ func MetadataFor(ctx context.Context, version string, upstream string) (*Meta, e
 	mutex.Lock()
 	defer mutex.Unlock()
 	version = strings.TrimPrefix(version, "v")
-	if meta, ok := cache[version]; ok {
-		return meta, nil
+	if _, ok := cache[version]; ok {
+		return metaFromCache(version)
 	}
 	url := fmt.Sprintf(metaURL, upstream, version)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -72,4 +72,29 @@ func CacheMeta(version string, meta Meta) {
 	mutex.Lock()
 	defer mutex.Unlock()
 	cache[version] = &meta
+}
+
+// metaFromCache returns a version from the cache, but without any pointers that might update things still in the cache.
+func metaFromCache(version string) (*Meta, error) {
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	// take the cached version and turn it into json
+	meta := cache[version]
+	if meta == nil {
+		return nil, nil
+	}
+	stringVer, err := json.Marshal(meta)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal meta: %w", err)
+	}
+
+	returnVersion := Meta{}
+	// unmarshal the json back into a Meta struct
+	err = json.Unmarshal(stringVer, &returnVersion)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal meta: %w", err)
+	}
+
+	return &returnVersion, nil
 }

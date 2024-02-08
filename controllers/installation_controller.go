@@ -356,7 +356,7 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 		return nil
 	}
 
-	fmt.Printf("updating cluster config with new helm charts: %+v", combinedConfigs)
+	fmt.Printf("updating cluster config with new helm charts - drift %b: %+v", chartDrift, combinedConfigs)
 
 	// Replace the current chart configs with the new chart configs
 	clusterConfig.Spec.Extensions.Helm = combinedConfigs

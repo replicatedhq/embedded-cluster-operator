@@ -263,7 +263,7 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 
 	// skip if the installer has already completed, failed or if the k0s upgrade is still in progress
 	if in.Status.State == v1beta1.InstallationStateFailed ||
-		in.Status.State == v1beta1.InstallationStateInstalled ||
+		//in.Status.State == v1beta1.InstallationStateInstalled ||
 		!in.Status.GetKubernetesInstalled() {
 		return nil
 	}

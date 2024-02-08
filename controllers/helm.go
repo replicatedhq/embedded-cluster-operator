@@ -207,7 +207,8 @@ func generateDesiredCharts(meta *release.Meta, clusterconfig k0sv1beta1.ClusterC
 	finalConfigs := map[string]k0sv1beta1.Chart{}
 	// include charts in the final spec that are already in the cluster (with merged values)
 	for _, chart := range clusterconfig.Spec.Extensions.Helm.Charts {
-		for _, newChart := range combinedConfigs.Charts {
+		for _, newChart2 := range combinedConfigs.Charts {
+			newChart := newChart2
 			// check if we can skip this chart
 			_, ok := protectedValues[chart.Name]
 			if chart.Name != newChart.Name || !ok {
@@ -224,7 +225,8 @@ func generateDesiredCharts(meta *release.Meta, clusterconfig k0sv1beta1.ClusterC
 		}
 	}
 	// include new charts in the final spec that are not yet in the cluster
-	for _, newChart := range combinedConfigs.Charts {
+	for _, newChart2 := range combinedConfigs.Charts {
+		newChart := newChart2
 		if _, ok := finalConfigs[newChart.Name]; !ok {
 			finalConfigs[newChart.Name] = newChart
 		}

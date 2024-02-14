@@ -382,7 +382,8 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 			}
 		}
 
-		log.Info("updating chart", "chart", chart, "old chart", oldChart, "new chart", newChart)
+		log.Info("updating chart", "chart", chart, "old chart", oldChart)
+		log.Info("updating chart", "chart", chart, "new chart", newChart)
 	}
 
 	// Replace the current chart configs with the new chart configs

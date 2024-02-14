@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -354,6 +355,34 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 		// if there is no drift, we should not reapply the cluster config
 		// however, the charts have not been applied yet, so we should not mark the installation as complete
 		return nil
+	}
+
+	for _, chart := range changedCharts {
+		oldChart := ""
+		for _, c := range clusterConfig.Spec.Extensions.Helm.Charts {
+			if c.Name == chart {
+				cjson, err := json.Marshal(c)
+				if err != nil {
+					log.Error(err, "failed to marshal chart")
+					continue
+				}
+				oldChart = string(cjson)
+			}
+		}
+
+		newChart := ""
+		for _, c := range combinedConfigs.Charts {
+			if c.Name == chart {
+				cjson, err := json.Marshal(c)
+				if err != nil {
+					log.Error(err, "failed to marshal chart")
+					continue
+				}
+				newChart = string(cjson)
+			}
+		}
+
+		log.Info("updating chart", "chart", chart, "old chart", oldChart, "new chart", newChart)
 	}
 
 	// Replace the current chart configs with the new chart configs

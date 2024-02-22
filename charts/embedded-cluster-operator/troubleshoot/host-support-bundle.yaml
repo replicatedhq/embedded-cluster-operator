@@ -1,7 +1,7 @@
 apiVersion: troubleshoot.sh/v1beta2
 kind: SupportBundle
 metadata:
-  name: embedded-cluster-supportbundle
+  name: embedded-cluster-host-support-bundle
 spec:
   uri: https://raw.githubusercontent.com/replicatedhq/embedded-cluster-operator/main/charts/embedded-cluster-operator/troubleshoot/host-support-bundle.yaml
   hostCollectors:
@@ -27,6 +27,9 @@ spec:
       collectorName: k0s-sysinfo
       command: k0s
       args: [ "sysinfo" ]
+  - copy:
+      collectorName: installer-logs
+      path: /var/lib/embedded-cluster/logs/*.log
   hostAnalyzers:
   - memory:
       checkName: Amount of Memory

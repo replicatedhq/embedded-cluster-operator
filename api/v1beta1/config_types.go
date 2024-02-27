@@ -50,10 +50,11 @@ type NodeCount struct {
 
 // NodeRole is the role of a node in the cluster.
 type NodeRole struct {
-	Name        string            `json:"name,omitempty"`
-	Description string            `json:"description,omitempty"`
-	NodeCount   *NodeCount        `json:"nodeCount,omitempty"`
-	Labels      map[string]string `json:"labels,omitempty"`
+	Name           string            `json:"name,omitempty"`
+	Description    string            `json:"description,omitempty"`
+	NodeCount      *NodeCount        `json:"nodeCount,omitempty"`
+	Labels         map[string]string `json:"labels,omitempty"`
+	WorkerProfiles []string          `json:"workerProfiles,omitempty"`
 }
 
 // Roles is the various roles in the cluster.
@@ -68,10 +69,11 @@ type Extensions struct {
 
 // ConfigSpec defines the desired state of Config
 type ConfigSpec struct {
-	Version              string               `json:"version,omitempty"`
-	Roles                Roles                `json:"roles,omitempty"`
-	UnsupportedOverrides UnsupportedOverrides `json:"unsupportedOverrides,omitempty"`
-	Extensions           Extensions           `json:"extensions,omitempty"`
+	Version              string                    `json:"version,omitempty"`
+	Roles                Roles                     `json:"roles,omitempty"`
+	UnsupportedOverrides UnsupportedOverrides      `json:"unsupportedOverrides,omitempty"`
+	Extensions           Extensions                `json:"extensions,omitempty"`
+	WorkerProfiles       k0sv1beta1.WorkerProfiles `json:"workerProfiles,omitempty"`
 }
 
 // ConfigStatus defines the observed state of Config

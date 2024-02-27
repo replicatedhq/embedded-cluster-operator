@@ -414,6 +414,7 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 }
 
 // ReconcileWorkerProfiles sets the worker profiles within the k0s cluster config.
+// it first checks that there are no pending/errored charts to avoid race conditions with helm applying those charts.
 func (r *InstallationReconciler) ReconcileWorkerProfiles(ctx context.Context, in *v1beta1.Installation) error {
 	log := ctrl.LoggerFrom(ctx)
 
@@ -421,6 +422,29 @@ func (r *InstallationReconciler) ReconcileWorkerProfiles(ctx context.Context, in
 	var clusterConfig k0sv1beta1.ClusterConfig
 	if err := r.Get(ctx, client.ObjectKey{Name: "k0s", Namespace: "kube-system"}, &clusterConfig); err != nil {
 		return fmt.Errorf("failed to get cluster config: %w", err)
+	}
+
+	existingHelm := &k0sv1beta1.HelmExtensions{}
+	if clusterConfig.Spec != nil && clusterConfig.Spec.Extensions != nil && clusterConfig.Spec.Extensions.Helm != nil {
+		existingHelm = clusterConfig.Spec.Extensions.Helm
+	}
+
+	// detect drift between the cluster config and the installer metadata
+	var installedCharts k0shelm.ChartList
+	if err := r.List(ctx, &installedCharts); err != nil {
+		return fmt.Errorf("failed to list installed charts: %w", err)
+	}
+	pendingCharts, chartErrors, err := detectChartCompletion(existingHelm, installedCharts)
+	if err != nil {
+		return fmt.Errorf("failed to check chart completion: %w", err)
+	}
+
+	if len(pendingCharts) > 0 {
+		log.Info("not updating worker profiles due to pending charts", "charts", pendingCharts)
+	}
+
+	if len(chartErrors) > 0 {
+		log.Info("not updating worker profiles due to chart errors", "errors", chartErrors)
 	}
 
 	// Replace the current chart configs with the new chart configs

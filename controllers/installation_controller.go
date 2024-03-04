@@ -413,6 +413,50 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 	return nil
 }
 
+// ReconcileWorkerProfiles sets the worker profiles within the k0s cluster config.
+// it first checks that there are no pending/errored charts to avoid race conditions with helm applying those charts.
+func (r *InstallationReconciler) ReconcileWorkerProfiles(ctx context.Context, in *v1beta1.Installation) error {
+	log := ctrl.LoggerFrom(ctx)
+
+	// fetch the current clusterConfig
+	var clusterConfig k0sv1beta1.ClusterConfig
+	if err := r.Get(ctx, client.ObjectKey{Name: "k0s", Namespace: "kube-system"}, &clusterConfig); err != nil {
+		return fmt.Errorf("failed to get cluster config: %w", err)
+	}
+
+	existingHelm := &k0sv1beta1.HelmExtensions{}
+	if clusterConfig.Spec != nil && clusterConfig.Spec.Extensions != nil && clusterConfig.Spec.Extensions.Helm != nil {
+		existingHelm = clusterConfig.Spec.Extensions.Helm
+	}
+
+	// detect drift between the cluster config and the installer metadata
+	var installedCharts k0shelm.ChartList
+	if err := r.List(ctx, &installedCharts); err != nil {
+		return fmt.Errorf("failed to list installed charts: %w", err)
+	}
+	pendingCharts, chartErrors, err := detectChartCompletion(existingHelm, installedCharts)
+	if err != nil {
+		return fmt.Errorf("failed to check chart completion: %w", err)
+	}
+
+	if len(pendingCharts) > 0 {
+		log.Info("not updating worker profiles due to pending charts", "charts", pendingCharts)
+	}
+
+	if len(chartErrors) > 0 {
+		log.Info("not updating worker profiles due to chart errors", "errors", chartErrors)
+	}
+
+	// Replace the current chart configs with the new chart configs
+	clusterConfig.Spec.WorkerProfiles = in.Spec.Config.WorkerProfiles
+	log.Info("updating cluster config with new worker profiles")
+	//Update the clusterConfig
+	if err := r.Update(ctx, &clusterConfig); err != nil {
+		return fmt.Errorf("failed to update cluster config: %w", err)
+	}
+	return nil
+}
+
 // SetStateBasedOnPlan sets the installation state based on the Plan state. For now we do not
 // report anything fancy but we should consider reporting here a summary of how many nodes
 // have been upgraded and how many are still pending.
@@ -597,6 +641,10 @@ func (r *InstallationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	log.Info("Reconciling addons")
 	if err := r.ReconcileHelmCharts(ctx, in); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to reconcile helm charts: %w", err)
+	}
+	log.Info("Reconciling worker profiles")
+	if err := r.ReconcileWorkerProfiles(ctx, in); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to reconcile worker profiles: %w", err)
 	}
 	if err := r.Status().Update(ctx, in); err != nil {
 		if errors.IsConflict(err) {

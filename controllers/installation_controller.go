@@ -487,6 +487,7 @@ func (r *InstallationReconciler) StartUpgrade(ctx context.Context, in *v1beta1.I
 	k0surl := fmt.Sprintf(
 		"%s/embedded-cluster-public-files/k0s-binaries/%s", in.Spec.MetricsBaseURL, meta.Versions.Kubernetes,
 	)
+	k0surl = "/var/lib/embedded-cluster/k0s"
 	plan := apv1b2.Plan{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "autopilot",

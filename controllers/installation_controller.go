@@ -303,7 +303,7 @@ func (r *InstallationReconciler) CopyArtifactsToNodes(ctx context.Context, in *v
 		if oldjob || newcfg {
 			log.Info("Deleting previous job", "oldJob", oldjob, "configchange", newcfg)
 			ready = false
-			status[node.Name] = "WaitingDeletion"
+			status[node.Name] = "WaitingPreviousJobDeletion"
 			policy := metav1.DeletePropagationForeground
 			opt := &client.DeleteOptions{PropagationPolicy: &policy}
 			if err := r.Delete(ctx, &job, opt); err != nil {
@@ -342,7 +342,7 @@ func (r *InstallationReconciler) CopyArtifactsToNodes(ctx context.Context, in *v
 		all = append(all, fmt.Sprintf("%s(%s)", name, state))
 	}
 	in.Status.Reason = fmt.Sprintf("Copying artifacts to nodes: %s", strings.Join(all, ", "))
-	in.Status.State = v1beta1.InstallationStateWaiting
+	in.Status.State = v1beta1.InstallationStateCopyingArtifacts
 	if strings.Contains(in.Status.Reason, "JobFailed") {
 		in.Status.State = v1beta1.InstallationStateFailed
 	}

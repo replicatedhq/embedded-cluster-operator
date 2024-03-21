@@ -6,7 +6,7 @@ import (
 	"github.com/k0sproject/dig"
 	k0shelm "github.com/k0sproject/k0s/pkg/apis/helm/v1beta1"
 	k0sv1beta1 "github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
-	"github.com/replicatedhq/embedded-cluster-operator/api/v1beta1"
+	"github.com/replicatedhq/embedded-cluster-kinds/apis/v1beta1"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/release"
 	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/yaml"
@@ -131,6 +131,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 							{
 								Name:    "test",
 								Version: "1.0.0",
+								Order:   2,
 							},
 						},
 					},
@@ -143,6 +144,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 					{
 						Name:    "test",
 						Version: "1.0.0",
+						Order:   102,
 					},
 				},
 			},
@@ -193,11 +195,13 @@ func Test_mergeHelmConfigs(t *testing.T) {
 				},
 				Charts: []k0sv1beta1.Chart{
 					{
-						Name: "origchart",
+						Name:  "origchart",
+						Order: 110,
 					},
 					{
 						Name:    "newchart",
 						Version: "1.0.0",
+						Order:   110,
 					},
 				},
 			},
@@ -251,7 +255,8 @@ func Test_detectChartCompletion(t *testing.T) {
 					Items: []k0shelm.Chart{
 						{
 							Status: k0shelm.ChartStatus{
-								Version: "1.0.0",
+								Version:    "1.0.0",
+								ValuesHash: "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
 							},
 							Spec: k0shelm.ChartSpec{
 								ReleaseName: "test",
@@ -259,7 +264,8 @@ func Test_detectChartCompletion(t *testing.T) {
 						},
 						{
 							Status: k0shelm.ChartStatus{
-								Version: "2.0.0",
+								Version:    "2.0.0",
+								ValuesHash: "60303ae22b998861bce3b28f33eec1be758a213c86c93c076dbe9f558c11c752",
 							},
 							Spec: k0shelm.ChartSpec{
 								ReleaseName: "test2",
@@ -290,7 +296,8 @@ func Test_detectChartCompletion(t *testing.T) {
 					Items: []k0shelm.Chart{
 						{
 							Status: k0shelm.ChartStatus{
-								Version: "1.0.0",
+								Version:    "1.0.0",
+								ValuesHash: "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
 							},
 							Spec: k0shelm.ChartSpec{
 								ReleaseName: "test",
@@ -317,7 +324,8 @@ func Test_detectChartCompletion(t *testing.T) {
 					Items: []k0shelm.Chart{
 						{
 							Status: k0shelm.ChartStatus{
-								Version: "1.0.0",
+								Version:    "1.0.0",
+								ValuesHash: "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
 							},
 							Spec: k0shelm.ChartSpec{
 								ReleaseName: "test",
@@ -352,7 +360,8 @@ func Test_detectChartCompletion(t *testing.T) {
 					Items: []k0shelm.Chart{
 						{
 							Status: k0shelm.ChartStatus{
-								Version: "1.0.0",
+								Version:    "1.0.0",
+								ValuesHash: "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
 							},
 							Spec: k0shelm.ChartSpec{
 								ReleaseName: "test",
@@ -464,12 +473,47 @@ func Test_detectChartCompletion(t *testing.T) {
 					Items: []k0shelm.Chart{
 						{
 							Status: k0shelm.ChartStatus{
-								Version: "1.0.0",
+								Version:    "1.0.0",
+								ValuesHash: "b87d302884cfcf4e2950a48468fc703baa00a749c552c72eccc1f1914c92e19a",
 							},
 							Spec: k0shelm.ChartSpec{
 								ReleaseName: "test",
 								Values: `
                   foo: asdf
+                `,
+							},
+						},
+					},
+				},
+			},
+			wantIncompleteCharts: []string{"test"},
+			wantChartErrors:      []string{},
+		},
+		{
+			name: "values hash differs",
+			args: args{
+				combinedConfigs: &k0sv1beta1.HelmExtensions{
+					Charts: []k0sv1beta1.Chart{
+						{
+							Name:    "test",
+							Version: "1.0.0",
+							Values: `
+                foo: bar
+              `,
+						},
+					},
+				},
+				installedCharts: k0shelm.ChartList{
+					Items: []k0shelm.Chart{
+						{
+							Status: k0shelm.ChartStatus{
+								Version:    "1.0.0",
+								ValuesHash: "incorrect hash",
+							},
+							Spec: k0shelm.ChartSpec{
+								ReleaseName: "test",
+								Values: `
+                  foo: bar
                 `,
 							},
 						},
@@ -657,6 +701,7 @@ func Test_detectChartDrift2(t *testing.T) {
 						},
 						Status: k0shelm.ChartStatus{
 							ReleaseName: "test",
+							ValuesHash:  "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
 						},
 					},
 					{
@@ -665,6 +710,7 @@ func Test_detectChartDrift2(t *testing.T) {
 						},
 						Status: k0shelm.ChartStatus{
 							ReleaseName: "test2",
+							ValuesHash:  "60303ae22b998861bce3b28f33eec1be758a213c86c93c076dbe9f558c11c752",
 						},
 					},
 				},
@@ -691,6 +737,7 @@ func Test_detectChartDrift2(t *testing.T) {
 						},
 						Status: k0shelm.ChartStatus{
 							ReleaseName: "test2",
+							ValuesHash:  "60303ae22b998861bce3b28f33eec1be758a213c86c93c076dbe9f558c11c752",
 						},
 					},
 				},
@@ -720,7 +767,7 @@ func Test_detectChartDrift2(t *testing.T) {
 			want: []string{"test"},
 		},
 		{
-			name: "one chart ok, one not applied, one not present",
+			name: "one chart ok, one not applied, one not present, one applying",
 			configCharts: &k0sv1beta1.HelmExtensions{
 				Charts: []k0sv1beta1.Chart{
 					{
@@ -735,6 +782,10 @@ func Test_detectChartDrift2(t *testing.T) {
 						Name:    "notpresent",
 						Version: "1",
 					},
+					{
+						Name:    "applying",
+						Version: "2",
+					},
 				},
 			},
 			charts: k0shelm.ChartList{
@@ -746,6 +797,7 @@ func Test_detectChartDrift2(t *testing.T) {
 						Status: k0shelm.ChartStatus{
 							ReleaseName: "okchart",
 							Version:     "1",
+							ValuesHash:  "c21bd877b996eed13c65080deab39ef6bec3fe475a39bf506f5afd095ba2aa95",
 						},
 					},
 					{
@@ -754,9 +806,19 @@ func Test_detectChartDrift2(t *testing.T) {
 						},
 						Status: k0shelm.ChartStatus{},
 					},
+					{
+						Spec: k0shelm.ChartSpec{
+							ReleaseName: "applying",
+						},
+						Status: k0shelm.ChartStatus{
+							ReleaseName: "applying",
+							Version:     "2",
+							ValuesHash:  "incorrect hash",
+						},
+					},
 				},
 			},
-			want: []string{"notapplied", "notpresent"},
+			want: []string{"notapplied", "notpresent", "applying"},
 		},
 	}
 	for _, tt := range tests {
@@ -776,6 +838,7 @@ func Test_detectChartDrift(t *testing.T) {
 		combinedConfigs *k0sv1beta1.HelmExtensions
 		currentConfigs  *k0sv1beta1.HelmExtensions
 		want            bool
+		wantNames       []string
 	}{
 		{
 			name: "one chart no drift",
@@ -797,7 +860,8 @@ func Test_detectChartDrift(t *testing.T) {
 					},
 				},
 			},
-			want: false,
+			want:      false,
+			wantNames: []string{},
 		},
 		{
 			name: "one chart different values",
@@ -819,7 +883,8 @@ func Test_detectChartDrift(t *testing.T) {
 					},
 				},
 			},
-			want: true,
+			want:      true,
+			wantNames: []string{"test"},
 		},
 		{
 			name: "one chart different version",
@@ -841,7 +906,8 @@ func Test_detectChartDrift(t *testing.T) {
 					},
 				},
 			},
-			want: true,
+			want:      true,
+			wantNames: []string{"test"},
 		},
 		{
 			name: "new chart added",
@@ -849,7 +915,7 @@ func Test_detectChartDrift(t *testing.T) {
 				Charts: []k0sv1beta1.Chart{
 					{
 						Name:    "test",
-						Version: "1.0.1",
+						Version: "1.0.0",
 						Values:  "abc: xyz",
 					},
 					{
@@ -867,15 +933,17 @@ func Test_detectChartDrift(t *testing.T) {
 					},
 				},
 			},
-			want: true,
+			want:      true,
+			wantNames: []string{"newchart"},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := require.New(t)
-			got, err := detectChartDrift(tt.combinedConfigs, tt.currentConfigs)
+			got, gotNames, err := detectChartDrift(tt.combinedConfigs, tt.currentConfigs)
 			req.NoError(err)
 			req.Equal(tt.want, got)
+			req.Equal(tt.wantNames, gotNames)
 		})
 	}
 }

@@ -52,9 +52,10 @@ var requeueAfter = time.Hour
 // NodeEventsBatch is a batch of node events, meant to be gathered at a given
 // moment in time and send later on to the metrics server.
 type NodeEventsBatch struct {
-	NodesAdded   []metrics.NodeEvent
-	NodesUpdated []metrics.NodeEvent
-	NodesRemoved []metrics.NodeRemovedEvent
+	NodesAdded     []metrics.NodeEvent
+	NodesUpdated   []metrics.NodeEvent
+	NodesRemoved   []metrics.NodeRemovedEvent
+	FirstNodeAdded *metrics.NodeEvent
 }
 
 // InstallationReconciler reconciles a Installation object
@@ -122,7 +123,13 @@ func (r *InstallationReconciler) ReconcileNodeStatuses(ctx context.Context, in *
 			return nil, fmt.Errorf("failed to update node status: %w", err)
 		}
 		if isnew {
-			batch.NodesAdded = append(batch.NodesAdded, event)
+			if len(nodes.Items) == 1 {
+				// this is the first node, and so this is not a node added event but a firstNode added event
+				batch.FirstNodeAdded = &event
+			} else {
+				batch.NodesAdded = append(batch.NodesAdded, event)
+			}
+
 			continue
 		}
 		batch.NodesUpdated = append(batch.NodesUpdated, event)
@@ -160,6 +167,11 @@ func (r *InstallationReconciler) ReportNodesChanges(ctx context.Context, in *v1b
 			ctrl.LoggerFrom(ctx).Error(err, "failed to notify node removed")
 		}
 	}
+	if batch.FirstNodeAdded != nil {
+		if err := metrics.NotifyFirstNodeAdded(ctx, in.Spec.MetricsBaseURL, *batch.FirstNodeAdded); err != nil {
+			ctrl.LoggerFrom(ctx).Error(err, "failed to notify first node added")
+		}
+	}
 }
 
 // ReportInstallationChanges reports back to the metrics server if the installation status has changed.
@@ -167,6 +179,9 @@ func (r *InstallationReconciler) ReportInstallationChanges(ctx context.Context, 
 	if len(before.Status.State) == 0 || before.Status.State == after.Status.State {
 		return
 	}
+
+	fmt.Printf("beforeState: %q, afterState %q\n", before.Status.State, after.Status.State)
+
 	var err error
 	switch after.Status.State {
 	case v1beta1.InstallationStateInstalling:

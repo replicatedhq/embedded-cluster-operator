@@ -110,6 +110,11 @@ func NotifyNodeAdded(ctx context.Context, baseURL string, ev NodeEvent) error {
 	return sendEvent(ctx, "NodeAdded", baseURL, ev)
 }
 
+// NotifyFirstNodeAdded notifies the metrics server that a node has been added.
+func NotifyFirstNodeAdded(ctx context.Context, baseURL string, ev NodeEvent) error {
+	return sendEvent(ctx, "FirstNodeAdded", baseURL, ev)
+}
+
 // NotifyNodeRemoved notifies the metrics server that a node has been removed.
 func NotifyNodeRemoved(ctx context.Context, baseURL string, ev NodeRemovedEvent) error {
 	return sendEvent(ctx, "NodeRemoved", baseURL, ev)

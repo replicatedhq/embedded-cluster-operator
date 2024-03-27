@@ -42,6 +42,16 @@ type Meta struct {
 	Protected map[string][]string
 }
 
+// LocalVersionMetadataConfigmap returns the namespaced name for a config map name that contains
+// the metadata for a given embedded cluster version.
+func LocalVersionMetadataConfigmap(version string) types.NamespacedName {
+	version = strings.TrimPrefix(version, "v")
+	return types.NamespacedName{
+		Name:      fmt.Sprintf("version-metadata-%s", version),
+		Namespace: "embedded-cluster",
+	}
+}
+
 // MetadataFor determines from where to read the metadata (from the cluster or remotely) and calls
 // the appropriate function.
 func MetadataFor(ctx context.Context, in *v1beta1.Installation, cli client.Client) (*Meta, error) {
@@ -61,11 +71,8 @@ func localMetadataFor(ctx context.Context, cli client.Client, version string) (*
 		return metaFromCache(version)
 	}
 
-	nsn := types.NamespacedName{
-		Name:      fmt.Sprintf("metadata-%s", version),
-		Namespace: "embedded-cluster",
-	}
 	var cm corev1.ConfigMap
+	nsn := LocalVersionMetadataConfigmap(version)
 	if err := cli.Get(ctx, nsn, &cm); err != nil {
 		return nil, fmt.Errorf("failed to get config map %q: %w", nsn.Name, err)
 	}

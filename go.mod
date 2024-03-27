@@ -3,6 +3,7 @@ module github.com/replicatedhq/embedded-cluster-operator
 go 1.21.7
 
 require (
+	github.com/go-logr/logr v1.4.1
 	github.com/k0sproject/dig v0.2.0
 	github.com/k0sproject/k0s v1.28.5-0.20231116142149-82f76181191c
 	github.com/k0sproject/version v0.6.0
@@ -14,6 +15,7 @@ require (
 	k8s.io/api v0.29.3
 	k8s.io/apimachinery v0.29.3
 	k8s.io/client-go v0.29.3
+	oras.land/oras-go/v2 v2.5.0
 	sigs.k8s.io/controller-runtime v0.17.2
 	sigs.k8s.io/yaml v1.4.0
 )
@@ -30,7 +32,6 @@ require (
 	github.com/evanphx/json-patch v5.7.0+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.8.0 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
-	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-logr/zapr v1.3.0 // indirect
 	github.com/go-openapi/jsonpointer v0.20.0 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
@@ -56,6 +57,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
+	github.com/opencontainers/image-spec v1.1.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.18.0 // indirect
@@ -72,6 +74,7 @@ require (
 	golang.org/x/exp v0.0.0-20220827204233-334a2380cb91 // indirect
 	golang.org/x/net v0.20.0 // indirect
 	golang.org/x/oauth2 v0.12.0 // indirect
+	golang.org/x/sync v0.6.0 // indirect
 	golang.org/x/sys v0.16.0 // indirect
 	golang.org/x/term v0.16.0 // indirect
 	golang.org/x/text v0.14.0 // indirect

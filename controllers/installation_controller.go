@@ -325,9 +325,6 @@ func (r *InstallationReconciler) CopyArtifactsToNodes(ctx context.Context, in *v
 			Namespace: "embedded-cluster",
 		}
 
-		// we start by assuming that the jobs has finished successfuly.
-		status[node.Name] = "JobSucceeded"
-
 		// we first verify if a job already exists for the node, if not then one is
 		// created and we move to the next node.
 		var job batchv1.Job
@@ -363,6 +360,7 @@ func (r *InstallationReconciler) CopyArtifactsToNodes(ctx context.Context, in *v
 
 		// from now on we know we analysing the correct job for the installation.
 		if job.Status.Succeeded > 0 {
+			status[node.Name] = "JobSucceeded"
 			log.Info("Job for node succeeded", "node", node.Name)
 			continue
 		}

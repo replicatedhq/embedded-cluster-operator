@@ -39,23 +39,73 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/yaml"
 
 	"github.com/replicatedhq/embedded-cluster-kinds/apis/v1beta1"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/artifacts"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/autopilot"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/metrics"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/release"
-	"github.com/replicatedhq/embedded-cluster-operator/pkg/static"
 )
 
 // requeueAfter is our default interval for requeueing. If nothing has changed with the
 // cluster nodes or the Installation object we will reconcile once every requeueAfter
 // interval.
 var requeueAfter = time.Hour
+
+// copyArtifactsJob is a job we create everytime we need to sync files into all nodes.
+// This job mounts /var/lib/embedded-cluster from the node and uses binaries that are
+// present there. This is not yet a complete version of the job as it misses some env
+// variables and a node selector, those are populated during the reconcile cycle.
+var copyArtifactsJob = &batchv1.Job{
+	ObjectMeta: metav1.ObjectMeta{
+		Namespace: "embedded-cluster",
+	},
+	Spec: batchv1.JobSpec{
+		BackoffLimit: ptr.To[int32](2),
+		Template: corev1.PodTemplateSpec{
+			Spec: corev1.PodSpec{
+				ServiceAccountName: "embedded-cluster-operator",
+				Volumes: []corev1.Volume{
+					{
+						Name: "host",
+						VolumeSource: corev1.VolumeSource{
+							HostPath: &corev1.HostPathVolumeSource{
+								Path: "/var/lib/embedded-cluster",
+								Type: ptr.To[corev1.HostPathType]("Directory"),
+							},
+						},
+					},
+				},
+				RestartPolicy: corev1.RestartPolicyNever,
+				Containers: []corev1.Container{
+					{
+						Name:  "embedded-cluster-updater",
+						Image: "busybox:latest",
+						VolumeMounts: []corev1.VolumeMount{
+							{
+								Name:      "host",
+								MountPath: "/var/lib/embedded-cluster",
+								ReadOnly:  false,
+							},
+						},
+						Command: []string{
+							"/bin/sh",
+							"-e",
+							"-c",
+							"/var/lib/embedded-cluster/bin/local-artifact-mirror pull binaries $INSTALLATION\n" +
+								"/var/lib/embedded-cluster/bin/local-artifact-mirror pull images $INSTALLATION\n" +
+								"/var/lib/embedded-cluster/bin/local-artifact-mirror pull helmcharts $INSTALLATION",
+						},
+					},
+				},
+			},
+		},
+	},
+}
 
 // NodeEventsBatch is a batch of node events, meant to be gathered at a given
 // moment in time and send later on to the metrics server.
@@ -211,16 +261,8 @@ func (r *InstallationReconciler) HashForAirgapConfig(in *v1beta1.Installation) (
 // CreateArtifactJobForNode creates a job to copy assets from the internal registry. This jobs runs in the provided node.
 func (r *InstallationReconciler) CreateArtifactJobForNode(ctx context.Context, in *v1beta1.Installation, node corev1.Node) error {
 	log := ctrl.LoggerFrom(ctx)
-	log.Info("Creating artifact job for node", "node", node.Name, "installation", in.Name)
-	raw, err := static.Assets.ReadFile("assets/artifacts-job.yaml")
-	if err != nil {
-		return fmt.Errorf("failed to read job template: %w", err)
-	}
 
-	var job batchv1.Job
-	if err := yaml.Unmarshal(raw, &job); err != nil {
-		return fmt.Errorf("failed to unmarshal job template: %w", err)
-	}
+	log.Info("Creating artifact job for node", "node", node.Name, "installation", in.Name)
 
 	hash, err := r.HashForAirgapConfig(in)
 	if err != nil {
@@ -231,6 +273,7 @@ func (r *InstallationReconciler) CreateArtifactJobForNode(ctx context.Context, i
 		"embedded-cluster/installation":          in.Name,
 		"embedded-cluster/artifacts-config-hash": hash,
 	}
+	job := copyArtifactsJob.DeepCopy()
 	job.Name = fmt.Sprintf("copy-artifacts-%s", node.Name)
 	job.Spec.Template.Labels, job.Labels = labels, labels
 	job.Spec.Template.Spec.NodeName = node.Name
@@ -239,7 +282,7 @@ func (r *InstallationReconciler) CreateArtifactJobForNode(ctx context.Context, i
 		corev1.EnvVar{Name: "INSTALLATION", Value: in.Name},
 	)
 
-	if err := r.Create(ctx, &job); err != nil {
+	if err := r.Create(ctx, job); err != nil {
 		return fmt.Errorf("failed to create job: %w", err)
 	}
 	log.Info("Artifact job for node created", "node", node.Name, "installation", in.Name)

@@ -46,6 +46,7 @@ type Meta struct {
 // the metadata for a given embedded cluster version.
 func LocalVersionMetadataConfigmap(version string) types.NamespacedName {
 	version = strings.TrimPrefix(version, "v")
+	version = strings.ReplaceAll(version, "+", "-")
 	return types.NamespacedName{
 		Name:      fmt.Sprintf("version-metadata-%s", version),
 		Namespace: "embedded-cluster",

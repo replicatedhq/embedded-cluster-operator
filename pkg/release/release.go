@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/gosimple/slug"
 	k0sv1beta1 "github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
 	"github.com/replicatedhq/embedded-cluster-kinds/apis/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -45,8 +46,7 @@ type Meta struct {
 // LocalVersionMetadataConfigmap returns the namespaced name for a config map name that contains
 // the metadata for a given embedded cluster version.
 func LocalVersionMetadataConfigmap(version string) types.NamespacedName {
-	version = strings.TrimPrefix(version, "v")
-	version = strings.ReplaceAll(version, "+", "-")
+	version = slug.Make(strings.TrimPrefix(version, "v"))
 	return types.NamespacedName{
 		Name:      fmt.Sprintf("version-metadata-%s", version),
 		Namespace: "embedded-cluster",

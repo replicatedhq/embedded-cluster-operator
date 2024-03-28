@@ -310,6 +310,12 @@ func (r *InstallationReconciler) CopyArtifactsToNodes(ctx context.Context, in *v
 		return false, fmt.Errorf("failed to list nodes: %w", err)
 	}
 
+	// generate a hash of the current config so we can detect config changes.
+	cfghash, err := r.HashForAirgapConfig(in)
+	if err != nil {
+		return false, fmt.Errorf("failed to hash airgap config: %w", err)
+	}
+
 	status := map[string]string{}
 	ready := true
 	for _, node := range nodes.Items {
@@ -338,17 +344,11 @@ func (r *InstallationReconciler) CopyArtifactsToNodes(ctx context.Context, in *v
 			continue
 		}
 
-		// generate a hash of the current config so we can detect config changes.
-		hash, err := r.HashForAirgapConfig(in)
-		if err != nil {
-			return false, fmt.Errorf("failed to hash airgap config: %w", err)
-		}
-
 		// we need to check if the job is for the given installation otherwise we delete
 		// it. we also need to check if the configuration has changed. this will trigger
 		// a new reconcile cycle.
 		oldjob := job.Labels["embedded-cluster/installation"] != in.Name
-		newcfg := job.Labels["embedded-cluster/artifacts-config-hash"] != hash
+		newcfg := job.Labels["embedded-cluster/artifacts-config-hash"] != cfghash
 		if oldjob || newcfg {
 			log.Info("Deleting previous job", "oldJob", oldjob, "configchange", newcfg)
 			ready = false

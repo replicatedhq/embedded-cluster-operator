@@ -197,7 +197,7 @@ func (r *InstallationReconciler) ReportInstallationChanges(ctx context.Context, 
 	}
 }
 
-// HashForAirgapConfig generates a hash for the aigap configuration. We can use this to detect config changes between
+// HashForAirgapConfig generates a hash for the airgap configuration. We can use this to detect config changes between
 // different reconcile cycles.
 func (r *InstallationReconciler) HashForAirgapConfig(in *v1beta1.Installation) (string, error) {
 	data, err := json.Marshal(in.Spec.Artifacts)

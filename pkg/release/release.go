@@ -8,14 +8,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
+	"github.com/go-logr/logr"
 	k0sv1beta1 "github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
-	"github.com/replicatedhq/embedded-cluster-kinds/apis/v1beta1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/replicatedhq/embedded-cluster-kinds/apis/v1beta1"
+	"github.com/replicatedhq/embedded-cluster-operator/pkg/artifacts"
 )
 
 var (
@@ -34,7 +38,7 @@ type Versions struct {
 }
 
 // Meta represents the components of a given embedded cluster release. This
-// is read directly from GitHub releases page.
+// is read directly from a replicated endpoint.
 type Meta struct {
 	Versions  Versions
 	K0sSHA    string
@@ -54,32 +58,39 @@ func LocalVersionMetadataConfigmap(version string) types.NamespacedName {
 
 // MetadataFor determines from where to read the metadata (from the cluster or remotely) and calls
 // the appropriate function.
-func MetadataFor(ctx context.Context, in *v1beta1.Installation, cli client.Client) (*Meta, error) {
+func MetadataFor(ctx context.Context, in *v1beta1.Installation, log logr.Logger, cli client.Client) (*Meta, error) {
 	if in.Spec.AirGap {
-		return localMetadataFor(ctx, cli, in.Spec.Config.Version)
+		return localMetadataFor(ctx, log, cli, in)
 	}
 	return remoteMetadataFor(ctx, in.Spec.Config.Version, in.Spec.MetricsBaseURL)
 }
 
 // localMetadataFor reads metadata for a given release. Attempts to read a local config map.
-func localMetadataFor(ctx context.Context, cli client.Client, version string) (*Meta, error) {
+func localMetadataFor(ctx context.Context, log logr.Logger, cli client.Client, in *v1beta1.Installation) (*Meta, error) {
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	version = strings.TrimPrefix(version, "v")
+	// we can only retrieve the metadata if we know the version we are referring to and if
+	// we also know the registry from where we need to read it.
+	if in.Spec.Config == nil || in.Spec.Config.Version == "" || in.Spec.Artifacts == nil {
+		return nil, fmt.Errorf("no version or artifacts found in the installation")
+	}
+
+	version := strings.TrimPrefix(in.Spec.Config.Version, "v")
 	if _, ok := cache[version]; ok {
 		return metaFromCache(version)
 	}
 
-	var cm corev1.ConfigMap
-	nsn := LocalVersionMetadataConfigmap(version)
-	if err := cli.Get(ctx, nsn, &cm); err != nil {
-		return nil, fmt.Errorf("failed to get config map %q: %w", nsn.Name, err)
+	location, err := artifacts.Pull(ctx, log, cli, in.Spec.Artifacts.EmbeddedClusterMetadata)
+	if err != nil {
+		return nil, fmt.Errorf("unable to pull metadata artifact: %w", err)
 	}
+	defer os.RemoveAll(location)
 
-	data, ok := cm.Data["metadata.json"]
-	if !ok {
-		return nil, fmt.Errorf("metadata.json not found in config map %q", nsn.Name)
+	fpath := filepath.Join(location, "version-metadata.json")
+	data, err := os.ReadFile(fpath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read version metadata: %w", err)
 	}
 
 	var meta Meta

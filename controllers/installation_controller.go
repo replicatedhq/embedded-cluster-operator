@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -45,7 +44,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 
 	"github.com/replicatedhq/embedded-cluster-kinds/apis/v1beta1"
-	"github.com/replicatedhq/embedded-cluster-operator/pkg/artifacts"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/autopilot"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/metrics"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/release"
@@ -289,53 +287,6 @@ func (r *InstallationReconciler) CreateArtifactJobForNode(ctx context.Context, i
 	return nil
 }
 
-// CopyVersionMetadataToCluster makes sure a config map with the embedded cluster version metadata exists in the
-// cluster. The data is read from the internal registry on the repository pointed by EmbeddedClusterMetadata.
-func (r *InstallationReconciler) CopyVersionMetadataToCluster(ctx context.Context, in *v1beta1.Installation) error {
-	log := ctrl.LoggerFrom(ctx)
-
-	// if there is no configuration, no version inside the configuration or the no artifacts location
-	// we log and skip as we can't determine for which version nor from where to retrieve the version
-	// metadata.
-	if in.Spec.Artifacts == nil || in.Spec.Config == nil || in.Spec.Config.Version == "" {
-		log.Info("Skipping version metadata copy to cluster", "installation", in.Name)
-		return nil
-	}
-
-	// let's first verify if we haven't yet fetched the metadata for the specified version. if we found
-	// the config map then it means we have already copied the data to the cluster and we can move on.
-	nsn := release.LocalVersionMetadataConfigmap(in.Spec.Config.Version)
-	var cm corev1.ConfigMap
-	if err := r.Get(ctx, nsn, &cm); err == nil {
-		return nil
-	} else if !errors.IsNotFound(err) {
-		return fmt.Errorf("failed to get version metadata configmap: %w", err)
-	}
-
-	// pull the artifact from the artifact location pointed by EmbeddedClusterMetadata. This property
-	// points to a repository inside the registry running on the cluster.
-	location, err := artifacts.Pull(ctx, log, r.Client, in.Spec.Artifacts.EmbeddedClusterMetadata)
-	if err != nil {
-		return fmt.Errorf("failed to pull version metadata: %w", err)
-	}
-	defer os.RemoveAll(location)
-
-	// now that we have the metadata locally we can reads its information and create the config map.
-	fpath := filepath.Join(location, "version-metadata.json")
-	data, err := os.ReadFile(fpath)
-	if err != nil {
-		return fmt.Errorf("failed to read version metadata: %w", err)
-	}
-
-	cm.Name = nsn.Name
-	cm.Namespace = nsn.Namespace
-	cm.Data = map[string]string{"metadata.json": string(data)}
-	if err := r.Create(ctx, &cm); err != nil {
-		return fmt.Errorf("failed to create version metadata configmap: %w", err)
-	}
-	return nil
-}
-
 // CopyArtifactsToNodes copies the installation artifacts to the nodes in the cluster.
 // This is done by creating a job for each node in the cluster, which will pull the
 // artifacts from the internal registry.
@@ -444,6 +395,7 @@ func (r *InstallationReconciler) CopyArtifactsToNodes(ctx context.Context, in *v
 // upgrade plan already exists we make sure the installation status is updated with the
 // latest plan status.
 func (r *InstallationReconciler) ReconcileK0sVersion(ctx context.Context, in *v1beta1.Installation) error {
+	log := ctrl.LoggerFrom(ctx)
 	// if the installation has no desired version then there isn't much we can do other
 	// than flagging as installed. this will allow the add-ons to be applied.
 	if in.Spec.Config == nil || in.Spec.Config.Version == "" {
@@ -463,7 +415,7 @@ func (r *InstallationReconciler) ReconcileK0sVersion(ctx context.Context, in *v1
 	}
 
 	// fetch the metadata for the desired embedded cluster version.
-	meta, err := release.MetadataFor(ctx, in, r.Client)
+	meta, err := release.MetadataFor(ctx, in, log, r.Client)
 	if err != nil {
 		in.Status.SetState(v1beta1.InstallationStateFailed, err.Error())
 		return nil
@@ -510,12 +462,6 @@ func (r *InstallationReconciler) ReconcileK0sVersion(ctx context.Context, in *v1
 	}
 
 	if in.Spec.AirGap {
-		// in airgap installation we need to make sure we have a config map containing the
-		// embedded cluster version metadata.
-		if err := r.CopyVersionMetadataToCluster(ctx, in); err != nil {
-			return fmt.Errorf("failed to copy version metadata to cluster: %w", err)
-		}
-
 		// in airgap installations let's make sure all assets have been copied to nodes.
 		// this may take some time so we only move forward when 'ready'.
 		if ready, err := r.CopyArtifactsToNodes(ctx, in); err != nil {
@@ -582,7 +528,7 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 		return nil
 	}
 
-	meta, err := release.MetadataFor(ctx, in, r.Client)
+	meta, err := release.MetadataFor(ctx, in, log, r.Client)
 	if err != nil {
 		in.Status.SetState(v1beta1.InstallationStateHelmChartUpdateFailure, err.Error())
 		return nil
@@ -742,11 +688,12 @@ func (r *InstallationReconciler) DetermineUpgradeTargets(ctx context.Context) (a
 
 // StartUpgrade creates an autopilot plan to upgrade to version specified in spec.config.version.
 func (r *InstallationReconciler) StartUpgrade(ctx context.Context, in *v1beta1.Installation) error {
+	log := ctrl.LoggerFrom(ctx)
 	targets, err := r.DetermineUpgradeTargets(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to determine upgrade targets: %w", err)
 	}
-	meta, err := release.MetadataFor(ctx, in, r.Client)
+	meta, err := release.MetadataFor(ctx, in, log, r.Client)
 	if err != nil {
 		return fmt.Errorf("failed to get release bundle: %w", err)
 	}

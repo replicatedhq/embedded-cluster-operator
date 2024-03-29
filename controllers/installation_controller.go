@@ -467,6 +467,15 @@ func (r *InstallationReconciler) ReconcileK0sVersion(ctx context.Context, in *v1
 		return nil
 	}
 
+	// in airgap installation the first thing we need to do is to ensure that the embedded
+	// cluster version metadata is available inside the cluster. we can't use the internet
+	// to fetch it directly from our remote servers.
+	if in.Spec.AirGap {
+		if err := r.CopyVersionMetadataToCluster(ctx, in); err != nil {
+			return fmt.Errorf("failed to copy version metadata to cluster: %w", err)
+		}
+	}
+
 	// fetch the metadata for the desired embedded cluster version.
 	meta, err := release.MetadataFor(ctx, in, r.Client)
 	if err != nil {
@@ -515,12 +524,6 @@ func (r *InstallationReconciler) ReconcileK0sVersion(ctx context.Context, in *v1
 	}
 
 	if in.Spec.AirGap {
-		// in airgap installation we need to make sure we have a config map containing the
-		// embedded cluster version metadata.
-		if err := r.CopyVersionMetadataToCluster(ctx, in); err != nil {
-			return fmt.Errorf("failed to copy version metadata to cluster: %w", err)
-		}
-
 		// in airgap installations let's make sure all assets have been copied to nodes.
 		// this may take some time so we only move forward when 'ready'.
 		if ready, err := r.CopyArtifactsToNodes(ctx, in); err != nil {

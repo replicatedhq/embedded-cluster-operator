@@ -282,6 +282,11 @@ func (r *InstallationReconciler) CreateArtifactJobForNode(ctx context.Context, i
 		corev1.EnvVar{Name: "INSTALLATION", Value: in.Name},
 	)
 
+	// overrides the job image if the environment says so.
+	if img := os.Getenv("EMBEDDEDCLUSTER_UTILS_IMAGE"); img != "" {
+		job.Spec.Template.Spec.Containers[0].Image = img
+	}
+
 	if err := r.Create(ctx, job); err != nil {
 		return fmt.Errorf("failed to create job: %w", err)
 	}

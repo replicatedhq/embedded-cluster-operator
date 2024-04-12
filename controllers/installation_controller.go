@@ -378,7 +378,7 @@ func (r *InstallationReconciler) CopyArtifactsToNodes(ctx context.Context, in *v
 	for _, node := range nodes.Items {
 		log.Info("Evaluating job for node", "node", node.Name)
 		nsn := types.NamespacedName{
-			Name:      fmt.Sprintf("copy-artifacts-%s", node.Name),
+			Name:      util.NameWithLengthLimit("copy-artifacts-", node.Name),
 			Namespace: "embedded-cluster",
 		}
 

@@ -106,9 +106,6 @@ var copyArtifactsJob = &batchv1.Job{
 								"/var/lib/embedded-cluster/bin/local-artifact-mirror pull images $INSTALLATION\n" +
 								"/var/lib/embedded-cluster/bin/local-artifact-mirror pull helmcharts $INSTALLATION\n" +
 								"mv /var/lib/embedded-cluster/bin/k0s /var/lib/embedded-cluster/bin/k0s-upgrade\n" +
-								"rm /var/lib/embedded-cluster/images/images-amd64-* || true\n" +
-								"cd /var/lib/embedded-cluster/images/\n" +
-								"mv images-amd64.tar images-amd64-${INSTALLATION}.tar\n" +
 								"echo 'done'",
 						},
 					},
@@ -381,7 +378,7 @@ func (r *InstallationReconciler) CopyArtifactsToNodes(ctx context.Context, in *v
 	for _, node := range nodes.Items {
 		log.Info("Evaluating job for node", "node", node.Name)
 		nsn := types.NamespacedName{
-			Name:      fmt.Sprintf("copy-artifacts-%s", node.Name),
+			Name:      util.NameWithLengthLimit("copy-artifacts-", node.Name),
 			Namespace: "embedded-cluster",
 		}
 
@@ -788,7 +785,7 @@ func (r *InstallationReconciler) CreateAirgapPlanCommand(ctx context.Context, in
 		allNodes = append(allNodes, node.Name)
 	}
 
-	imageURL := fmt.Sprintf("http://127.0.0.1:50000/images/images-amd64-%s.tar", in.Name)
+	imageURL := fmt.Sprintf("http://127.0.0.1:50000/images/images-amd64.tar")
 
 	return &apv1b2.PlanCommand{
 		AirgapUpdate: &apv1b2.PlanCommandAirgapUpdate{

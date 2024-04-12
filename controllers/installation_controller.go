@@ -107,7 +107,8 @@ var copyArtifactsJob = &batchv1.Job{
 								"mv /var/lib/embedded-cluster/bin/k0s /var/lib/embedded-cluster/bin/k0s-upgrade\n" +
 								"rm /var/lib/embedded-cluster/images/images-amd64-* || true\n" +
 								"cd /var/lib/embedded-cluster/images/\n" +
-								"mv images-amd64.tar images-amd64-${INSTALLATION}.tar",
+								"mv images-amd64.tar images-amd64-${INSTALLATION}.tar\n" +
+								"echo 'done'",
 						},
 					},
 				},

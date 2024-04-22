@@ -95,6 +95,11 @@ func mergeHelmConfigs(meta *ectypes.ReleaseMetadata, in *v1beta1.Installation) *
 		combinedConfigs.Repositories = append(combinedConfigs.Repositories, meta.AirgapConfigs.Repositories...)
 	}
 
+	if in != nil && in.Spec.LicenseInfo != nil && in.Spec.LicenseInfo.IsSnapshotSupported {
+		combinedConfigs.Charts = append(combinedConfigs.Charts, meta.BuiltinConfigs["velero"].Charts...)
+		combinedConfigs.Repositories = append(combinedConfigs.Repositories, meta.BuiltinConfigs["velero"].Repositories...)
+	}
+
 	// k0s sorts order numbers alphabetically because they're used in file names,
 	// which means double digits can be sorted before single digits (e.g. "10" comes before "5").
 	// We add 100 to the order of each chart to work around this.

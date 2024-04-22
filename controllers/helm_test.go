@@ -7,7 +7,7 @@ import (
 	k0shelm "github.com/k0sproject/k0s/pkg/apis/helm/v1beta1"
 	k0sv1beta1 "github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
 	"github.com/replicatedhq/embedded-cluster-kinds/apis/v1beta1"
-	"github.com/replicatedhq/embedded-cluster-operator/pkg/release"
+	ectypes "github.com/replicatedhq/embedded-cluster-kinds/types"
 	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/yaml"
 )
@@ -111,7 +111,7 @@ password: "newpassword"
 
 func Test_mergeHelmConfigs(t *testing.T) {
 	type args struct {
-		meta *release.Meta
+		meta *ectypes.ReleaseMetadata
 		in   v1beta1.Extensions
 	}
 	tests := []struct {
@@ -152,8 +152,8 @@ func Test_mergeHelmConfigs(t *testing.T) {
 		{
 			name: "add new chart + repo",
 			args: args{
-				meta: &release.Meta{
-					Configs: &k0sv1beta1.HelmExtensions{
+				meta: &ectypes.ReleaseMetadata{
+					Configs: k0sv1beta1.HelmExtensions{
 						ConcurrencyLevel: 1,
 						Repositories: []k0sv1beta1.Repository{
 							{
@@ -538,7 +538,7 @@ func Test_detectChartCompletion(t *testing.T) {
 
 func Test_generateDesiredCharts(t *testing.T) {
 	type args struct {
-		meta            *release.Meta
+		meta            *ectypes.ReleaseMetadata
 		clusterconfig   k0sv1beta1.ClusterConfig
 		combinedConfigs *k0sv1beta1.HelmExtensions
 	}
@@ -565,7 +565,7 @@ func Test_generateDesiredCharts(t *testing.T) {
 		{
 			name: "add new chart, change chart values, change chart versions, remove old chart",
 			args: args{
-				meta: &release.Meta{
+				meta: &ectypes.ReleaseMetadata{
 					Protected: map[string][]string{
 						"changethis": {"abc"},
 					},

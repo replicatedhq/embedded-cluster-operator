@@ -115,9 +115,10 @@ func Test_mergeHelmConfigs(t *testing.T) {
 		in   v1beta1.Extensions
 	}
 	tests := []struct {
-		name string
-		args args
-		want *k0sv1beta1.HelmExtensions
+		name   string
+		args   args
+		airgap bool
+		want   *k0sv1beta1.HelmExtensions
 	}{
 		{
 			name: "no meta",
@@ -166,6 +167,13 @@ func Test_mergeHelmConfigs(t *testing.T) {
 							},
 						},
 					},
+					AirgapConfigs: k0sv1beta1.HelmExtensions{
+						Charts: []k0sv1beta1.Chart{
+							{
+								Name: "airgapchart",
+							},
+						},
+					},
 				},
 				in: v1beta1.Extensions{
 					Helm: &k0sv1beta1.HelmExtensions{
@@ -206,6 +214,53 @@ func Test_mergeHelmConfigs(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:   "airgap enabled",
+			airgap: true,
+			args: args{
+				meta: &ectypes.ReleaseMetadata{
+					Configs: k0sv1beta1.HelmExtensions{
+						ConcurrencyLevel: 1,
+						Repositories: []k0sv1beta1.Repository{
+							{
+								Name: "origrepo",
+							},
+						},
+						Charts: []k0sv1beta1.Chart{
+							{
+								Name: "origchart",
+							},
+						},
+					},
+					AirgapConfigs: k0sv1beta1.HelmExtensions{
+						Charts: []k0sv1beta1.Chart{
+							{
+								Name: "airgapchart",
+							},
+						},
+					},
+				},
+				in: v1beta1.Extensions{},
+			},
+			want: &k0sv1beta1.HelmExtensions{
+				ConcurrencyLevel: 1,
+				Repositories: []k0sv1beta1.Repository{
+					{
+						Name: "origrepo",
+					},
+				},
+				Charts: []k0sv1beta1.Chart{
+					{
+						Name:  "origchart",
+						Order: 100,
+					},
+					{
+						Name:  "airgapchart",
+						Order: 100,
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -215,6 +270,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 						Version:    "1.0.0",
 						Extensions: tt.args.in,
 					},
+					AirGap: tt.airgap,
 				},
 			}
 

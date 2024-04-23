@@ -47,8 +47,6 @@ spec:
                     properties:
                       velero:
                         properties:
-                          enabled:
-                            type: boolean
                           values:
                             type: string
                         type: object
@@ -303,8 +301,6 @@ spec:
                         properties:
                           velero:
                             properties:
-                              enabled:
-                                type: boolean
                               values:
                                 type: string
                             type: object

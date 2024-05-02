@@ -100,6 +100,9 @@ func mergeHelmConfigs(meta *ectypes.ReleaseMetadata, in *v1beta1.Installation) *
 		combinedConfigs.Repositories = append(combinedConfigs.Repositories, meta.BuiltinConfigs["velero"].Repositories...)
 	}
 
+	// update the infrastructure charts from the install spec
+	combinedConfigs.Charts = updateInfraChartsFromInstall(in, combinedConfigs.Charts)
+
 	// k0s sorts order numbers alphabetically because they're used in file names,
 	// which means double digits can be sorted before single digits (e.g. "10" comes before "5").
 	// We add 100 to the order of each chart to work around this.
@@ -107,6 +110,42 @@ func mergeHelmConfigs(meta *ectypes.ReleaseMetadata, in *v1beta1.Installation) *
 		combinedConfigs.Charts[k].Order += 100
 	}
 	return combinedConfigs
+}
+
+// update the 'admin-console' and 'embedded-cluster-operator' charts to add cluster ID, binary name, and airgap status
+func updateInfraChartsFromInstall(in *v1beta1.Installation, charts k0sv1beta1.ChartsSettings) k0sv1beta1.ChartsSettings {
+	if in == nil {
+		return charts
+	}
+
+	for i, chart := range charts {
+		if chart.Name == "admin-console" {
+			// admin-console has "embeddedClusterID" and "isAirgap" as dynamic values
+			newValuesTmpl := `embeddedClusterID: "%s"
+isAirgap: "%t"`
+			newValuesStr := fmt.Sprintf(newValuesTmpl, in.Spec.ClusterID, in.Spec.AirGap)
+
+			newVal, err := MergeValues(newValuesStr, chart.Values, []string{"embeddedClusterID", "isAirgap"})
+			if err != nil {
+				fmt.Printf("failed to merge values for %s: %v", chart.Name, err)
+			} else {
+				charts[i].Values = newVal
+			}
+		}
+		if chart.Name == "embedded-cluster-operator" {
+			// embedded-cluster-operator has "embeddedBinaryName" and "embeddedClusterID" as dynamic values
+			newValuesTmpl := `embeddedBinaryName: "%s"
+embeddedClusterID: "%s"`
+			newValuesStr := fmt.Sprintf(newValuesTmpl, in.Spec.BinaryName, in.Spec.ClusterID)
+			newVal, err := MergeValues(newValuesStr, chart.Values, []string{"embeddedBinaryName", "embeddedClusterID"})
+			if err != nil {
+				fmt.Printf("failed to merge values for %s: %v", chart.Name, err)
+			} else {
+				charts[i].Values = newVal
+			}
+		}
+	}
+	return charts
 }
 
 // detect if the charts currently installed in the cluster (currentConfigs) match the desired charts (combinedConfigs)

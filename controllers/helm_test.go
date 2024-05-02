@@ -1303,3 +1303,85 @@ func Test_applyUserProvidedAddonOverrides(t *testing.T) {
 		})
 	}
 }
+
+func Test_updateInfraChartsFromInstall(t *testing.T) {
+	type args struct {
+		in     *v1beta1.Installation
+		charts []k0sv1beta1.Chart
+	}
+	tests := []struct {
+		name string
+		args args
+		want []k0sv1beta1.Chart
+	}{
+		{
+			name: "other chart",
+			args: args{
+				in: &v1beta1.Installation{
+					Spec: v1beta1.InstallationSpec{
+						ClusterID: "abc",
+					},
+				},
+				charts: []k0sv1beta1.Chart{
+					{
+						Name:   "test",
+						Values: "abc: xyz",
+					},
+				},
+			},
+			want: []k0sv1beta1.Chart{
+				{
+					Name:   "test",
+					Values: "abc: xyz",
+				},
+			},
+		},
+		{
+			name: "admin console and operator",
+			args: args{
+				in: &v1beta1.Installation{
+					Spec: v1beta1.InstallationSpec{
+						ClusterID:  "testid",
+						BinaryName: "testbin",
+						AirGap:     true,
+					},
+				},
+				charts: []k0sv1beta1.Chart{
+					{
+						Name:   "test",
+						Values: "abc: xyz",
+					},
+					{
+						Name:   "admin-console",
+						Values: "abc: xyz",
+					},
+					{
+						Name:   "embedded-cluster-operator",
+						Values: "this: that",
+					},
+				},
+			},
+			want: []k0sv1beta1.Chart{
+				{
+					Name:   "test",
+					Values: "abc: xyz",
+				},
+				{
+					Name:   "admin-console",
+					Values: "abc: xyz\nembeddedClusterID: testid\nisAirgap: \"true\"\n",
+				},
+				{
+					Name:   "embedded-cluster-operator",
+					Values: "embeddedBinaryName: testbin\nembeddedClusterID: testid\nthis: that\n",
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := require.New(t)
+			got := updateInfraChartsFromInstall(tt.args.in, tt.args.charts)
+			req.ElementsMatch(tt.want, got)
+		})
+	}
+}

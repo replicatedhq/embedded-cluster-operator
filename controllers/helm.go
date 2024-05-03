@@ -8,7 +8,6 @@ import (
 	k0shelm "github.com/k0sproject/k0s/pkg/apis/helm/v1beta1"
 	k0sv1beta1 "github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
 	"github.com/ohler55/ojg/jp"
-	"github.com/ohler55/ojg/oj"
 	ectypes "github.com/replicatedhq/embedded-cluster-kinds/types"
 	"sigs.k8s.io/yaml"
 
@@ -17,51 +16,27 @@ import (
 
 const DEFAULT_VENDOR_CHART_ORDER = 10
 
-// MergeValues takes two helm values in the form of dig.Mapping{} and a list of values (in jsonpath notation) to not override
-// and combines the values. it returns the resultant yaml string
-func MergeValues(oldValues, newValues string, protectedValues []string) (string, error) {
-
+func setHelmValue(valuesYaml, path, newValue string) (string, error) {
 	newValuesMap := dig.Mapping{}
-	if err := yaml.Unmarshal([]byte(newValues), &newValuesMap); err != nil {
-		return "", fmt.Errorf("failed to unmarshal new chart values: %w", err)
+	if err := yaml.Unmarshal([]byte(valuesYaml), &newValuesMap); err != nil {
+		return "", fmt.Errorf("failed to unmarshal initial values: %w", err)
 	}
 
-	// merge the known fields from the current chart values to the new chart values
-	for _, path := range protectedValues {
-		x, err := jp.ParseString(path)
-		if err != nil {
-			return "", fmt.Errorf("failed to parse json path: %w", err)
-		}
+	x, err := jp.ParseString(path)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse json path %q: %w", path, err)
+	}
 
-		valuesJson, err := yaml.YAMLToJSON([]byte(oldValues))
-		if err != nil {
-			return "", fmt.Errorf("failed to convert yaml to json: %w", err)
-		}
-
-		obj, err := oj.ParseString(string(valuesJson))
-		if err != nil {
-			return "", fmt.Errorf("failed to parse json: %w", err)
-		}
-
-		value := x.Get(obj)
-
-		// if the value is empty, skip it
-		if len(value) < 1 {
-			continue
-		}
-
-		err = x.Set(newValuesMap, value[0])
-		if err != nil {
-			return "", fmt.Errorf("failed to set json path: %w", err)
-		}
+	err = x.Set(newValuesMap, newValue)
+	if err != nil {
+		return "", fmt.Errorf("failed to set json path %q to %q: %w", path, newValue, err)
 	}
 
 	newValuesYaml, err := yaml.Marshal(newValuesMap)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal new chart values: %w", err)
+		return "", fmt.Errorf("failed to marshal updated values: %w", err)
 	}
 	return string(newValuesYaml), nil
-
 }
 
 // merge the default helm charts and repositories (from meta.Configs) with vendor helm charts (from in.Spec.Config.Extensions.Helm)
@@ -121,28 +96,35 @@ func updateInfraChartsFromInstall(in *v1beta1.Installation, charts k0sv1beta1.Ch
 	for i, chart := range charts {
 		if chart.Name == "admin-console" {
 			// admin-console has "embeddedClusterID" and "isAirgap" as dynamic values
-			newValuesTmpl := `embeddedClusterID: "%s"
-isAirgap: "%t"`
-			newValuesStr := fmt.Sprintf(newValuesTmpl, in.Spec.ClusterID, in.Spec.AirGap)
-
-			newVal, err := MergeValues(newValuesStr, chart.Values, []string{"embeddedClusterID", "isAirgap"})
+			newVals, err := setHelmValue(chart.Values, "embeddedClusterID", in.Spec.ClusterID)
 			if err != nil {
-				fmt.Printf("failed to merge values for %s: %v", chart.Name, err)
-			} else {
-				charts[i].Values = newVal
+				fmt.Printf("failed to set embeddedClusterID for %s: %v", chart.Name, err)
+				continue
 			}
+
+			newVals, err = setHelmValue(newVals, "isAirgap", fmt.Sprintf("%t", in.Spec.AirGap))
+			if err != nil {
+				fmt.Printf("failed to set isAirgap for %s: %v", chart.Name, err)
+				continue
+			}
+
+			charts[i].Values = newVals
 		}
 		if chart.Name == "embedded-cluster-operator" {
 			// embedded-cluster-operator has "embeddedBinaryName" and "embeddedClusterID" as dynamic values
-			newValuesTmpl := `embeddedBinaryName: "%s"
-embeddedClusterID: "%s"`
-			newValuesStr := fmt.Sprintf(newValuesTmpl, in.Spec.BinaryName, in.Spec.ClusterID)
-			newVal, err := MergeValues(newValuesStr, chart.Values, []string{"embeddedBinaryName", "embeddedClusterID"})
+			newVals, err := setHelmValue(chart.Values, "embeddedBinaryName", in.Spec.BinaryName)
 			if err != nil {
-				fmt.Printf("failed to merge values for %s: %v", chart.Name, err)
-			} else {
-				charts[i].Values = newVal
+				fmt.Printf("failed to set embeddedBinaryName for %s: %v", chart.Name, err)
+				continue
 			}
+
+			newVals, err = setHelmValue(newVals, "embeddedClusterID", in.Spec.ClusterID)
+			if err != nil {
+				fmt.Printf("failed to set embeddedClusterID for %s: %v", chart.Name, err)
+				continue
+			}
+
+			charts[i].Values = newVals
 		}
 	}
 	return charts
@@ -287,50 +269,6 @@ func applyUserProvidedAddonOverrides(in *v1beta1.Installation, combinedConfigs *
 		patchedConfigs.Charts = append(patchedConfigs.Charts, chart)
 	}
 	return patchedConfigs, nil
-}
-
-// merge the helmcharts in the cluster with the charts we desire to be in the cluster
-// if the chart is already in the cluster, merge the values
-func generateDesiredCharts(meta *ectypes.ReleaseMetadata, clusterconfig k0sv1beta1.ClusterConfig, combinedConfigs *k0sv1beta1.HelmExtensions) ([]k0sv1beta1.Chart, error) {
-	// get the protected values from the release metadata
-	protectedValues := map[string][]string{}
-	if meta != nil && meta.Protected != nil {
-		protectedValues = meta.Protected
-	}
-
-	// TODO - apply unsupported override from installation config
-	finalConfigs := map[string]k0sv1beta1.Chart{}
-	// include charts in the final spec that are already in the cluster (with merged values)
-	for _, chart := range clusterconfig.Spec.Extensions.Helm.Charts {
-		for _, newChart := range combinedConfigs.Charts {
-			// check if we can skip this chart
-			_, ok := protectedValues[chart.Name]
-			if chart.Name != newChart.Name || !ok {
-				continue
-			}
-			// if we have known fields, we need to merge them forward
-			newValuesYaml, err := MergeValues(chart.Values, newChart.Values, protectedValues[chart.Name])
-			if err != nil {
-				return nil, fmt.Errorf("failed to merge chart values: %w", err)
-			}
-			newChart.Values = newValuesYaml
-			finalConfigs[newChart.Name] = newChart
-			break
-		}
-	}
-	// include new charts in the final spec that are not yet in the cluster
-	for _, newChart := range combinedConfigs.Charts {
-		if _, ok := finalConfigs[newChart.Name]; !ok {
-			finalConfigs[newChart.Name] = newChart
-		}
-	}
-
-	// flatten chart map
-	finalChartList := []k0sv1beta1.Chart{}
-	for _, chart := range finalConfigs {
-		finalChartList = append(finalChartList, chart)
-	}
-	return finalChartList, nil
 }
 
 // patchExtensionsForAirGap makes sure we do not have any external repository reference and also makes

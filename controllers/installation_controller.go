@@ -638,12 +638,6 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 		return fmt.Errorf("failed to get cluster config: %w", err)
 	}
 
-	finalChartList, err := generateDesiredCharts(meta, clusterConfig, combinedConfigs)
-	if err != nil {
-		return err
-	}
-	combinedConfigs.Charts = finalChartList
-
 	if in.Spec.AirGap {
 		// if in airgap mode then all charts are already on the node's disk. we just need to
 		// make sure that the helm charts are pointing to the right location on disk and that

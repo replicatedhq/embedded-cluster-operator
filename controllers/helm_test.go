@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"context"
 	"testing"
 
 	k0shelm "github.com/k0sproject/k0s/pkg/apis/helm/v1beta1"
@@ -237,7 +238,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 			}
 
 			req := require.New(t)
-			got := mergeHelmConfigs(tt.args.meta, &installation)
+			got := mergeHelmConfigs(context.TODO(), tt.args.meta, &installation)
 			req.Equal(tt.want, got)
 		})
 	}
@@ -1153,7 +1154,7 @@ func Test_updateInfraChartsFromInstall(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := require.New(t)
-			got := updateInfraChartsFromInstall(tt.args.in, tt.args.charts)
+			got := updateInfraChartsFromInstall(context.TODO(), tt.args.in, tt.args.charts)
 			req.ElementsMatch(tt.want, got)
 		})
 	}

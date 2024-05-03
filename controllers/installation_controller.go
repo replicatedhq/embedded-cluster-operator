@@ -630,7 +630,7 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 		return nil
 	}
 
-	combinedConfigs := mergeHelmConfigs(meta, in)
+	combinedConfigs := mergeHelmConfigs(ctx, meta, in)
 
 	// fetch the current clusterConfig
 	var clusterConfig k0sv1beta1.ClusterConfig

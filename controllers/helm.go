@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 
@@ -9,6 +10,7 @@ import (
 	k0sv1beta1 "github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
 	"github.com/ohler55/ojg/jp"
 	ectypes "github.com/replicatedhq/embedded-cluster-kinds/types"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/yaml"
 
 	"github.com/replicatedhq/embedded-cluster-kinds/apis/v1beta1"
@@ -40,7 +42,7 @@ func setHelmValue(valuesYaml, path, newValue string) (string, error) {
 }
 
 // merge the default helm charts and repositories (from meta.Configs) with vendor helm charts (from in.Spec.Config.Extensions.Helm)
-func mergeHelmConfigs(meta *ectypes.ReleaseMetadata, in *v1beta1.Installation) *k0sv1beta1.HelmExtensions {
+func mergeHelmConfigs(ctx context.Context, meta *ectypes.ReleaseMetadata, in *v1beta1.Installation) *k0sv1beta1.HelmExtensions {
 	// merge default helm charts (from meta.Configs) with vendor helm charts (from in.Spec.Config.Extensions.Helm)
 	combinedConfigs := &k0sv1beta1.HelmExtensions{ConcurrencyLevel: 1}
 	if meta != nil {
@@ -76,7 +78,7 @@ func mergeHelmConfigs(meta *ectypes.ReleaseMetadata, in *v1beta1.Installation) *
 	}
 
 	// update the infrastructure charts from the install spec
-	combinedConfigs.Charts = updateInfraChartsFromInstall(in, combinedConfigs.Charts)
+	combinedConfigs.Charts = updateInfraChartsFromInstall(ctx, in, combinedConfigs.Charts)
 
 	// k0s sorts order numbers alphabetically because they're used in file names,
 	// which means double digits can be sorted before single digits (e.g. "10" comes before "5").
@@ -88,7 +90,9 @@ func mergeHelmConfigs(meta *ectypes.ReleaseMetadata, in *v1beta1.Installation) *
 }
 
 // update the 'admin-console' and 'embedded-cluster-operator' charts to add cluster ID, binary name, and airgap status
-func updateInfraChartsFromInstall(in *v1beta1.Installation, charts k0sv1beta1.ChartsSettings) k0sv1beta1.ChartsSettings {
+func updateInfraChartsFromInstall(ctx context.Context, in *v1beta1.Installation, charts k0sv1beta1.ChartsSettings) k0sv1beta1.ChartsSettings {
+	log := ctrl.LoggerFrom(ctx)
+
 	if in == nil {
 		return charts
 	}
@@ -98,13 +102,13 @@ func updateInfraChartsFromInstall(in *v1beta1.Installation, charts k0sv1beta1.Ch
 			// admin-console has "embeddedClusterID" and "isAirgap" as dynamic values
 			newVals, err := setHelmValue(chart.Values, "embeddedClusterID", in.Spec.ClusterID)
 			if err != nil {
-				fmt.Printf("failed to set embeddedClusterID for %s: %v", chart.Name, err)
+				log.Info("failed to set embeddedClusterID for %s: %v", chart.Name, err)
 				continue
 			}
 
 			newVals, err = setHelmValue(newVals, "isAirgap", fmt.Sprintf("%t", in.Spec.AirGap))
 			if err != nil {
-				fmt.Printf("failed to set isAirgap for %s: %v", chart.Name, err)
+				log.Info("failed to set isAirgap for %s: %v", chart.Name, err)
 				continue
 			}
 
@@ -114,13 +118,13 @@ func updateInfraChartsFromInstall(in *v1beta1.Installation, charts k0sv1beta1.Ch
 			// embedded-cluster-operator has "embeddedBinaryName" and "embeddedClusterID" as dynamic values
 			newVals, err := setHelmValue(chart.Values, "embeddedBinaryName", in.Spec.BinaryName)
 			if err != nil {
-				fmt.Printf("failed to set embeddedBinaryName for %s: %v", chart.Name, err)
+				log.Info("failed to set embeddedBinaryName for %s: %v", err)
 				continue
 			}
 
 			newVals, err = setHelmValue(newVals, "embeddedClusterID", in.Spec.ClusterID)
 			if err != nil {
-				fmt.Printf("failed to set embeddedClusterID for %s: %v", chart.Name, err)
+				log.Info("failed to set embeddedClusterID for %s: %v", err)
 				continue
 			}
 

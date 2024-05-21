@@ -24,7 +24,35 @@ data:
               containers:
               - image: {{ .Values.utilsImage }}
                 imagePullPolicy: Always
-                args: ["chroot","/host","journalctl","-u","k0scontroller","--no-pager"]
+                args: ["chroot","/host","journalctl","-u","k0scontroller","--no-pager","--since","2 days ago"]
+                name: debugger
+                resources: {}
+                terminationMessagePath: /dev/termination-log
+                terminationMessagePolicy: File
+                volumeMounts:
+                - mountPath: /host
+                  name: host-root
+              dnsPolicy: ClusterFirst
+              enableServiceLinks: true
+              hostIPC: true
+              hostNetwork: true
+              hostPID: true
+              securityContext: {}
+              tolerations:
+              - operator: Exists
+              volumes:
+              - hostPath:
+                  path: /
+                  type: ""
+                name: host-root
+        - runDaemonSet:
+            name: "k0sworker"
+            namespace: default
+            podSpec:
+              containers:
+              - image: {{ .Values.utilsImage }}
+                imagePullPolicy: Always
+                args: ["chroot","/host","journalctl","-u","k0scontroller","--no-pager","--since","2 days ago"]
                 name: debugger
                 resources: {}
                 terminationMessagePath: /dev/termination-log

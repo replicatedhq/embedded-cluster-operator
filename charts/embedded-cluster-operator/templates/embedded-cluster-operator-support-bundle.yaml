@@ -8,4 +8,4 @@ metadata:
     {{- toYaml . | nindent 4 }}
     {{- end }}
 data:
-  support-bundle-spec: {{ .Files.Get "troubleshoot/cluster-support-bundle.yaml" | quote }}
+  support-bundle-spec: {{ tpl (.Files.Get "troubleshoot/cluster-support-bundle.yaml" | quote) . }}

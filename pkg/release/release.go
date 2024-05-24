@@ -95,23 +95,22 @@ func localMetadataFor(ctx context.Context, cli client.Client, version string) (*
 	if err := json.Unmarshal([]byte(data), meta); err != nil {
 		return nil, fmt.Errorf("failed to decode bundle: %w", err)
 	}
+	cache[version] = meta
 
 	var secret corev1.Secret
 	nsn = types.NamespacedName{Namespace: "registry", Name: "registry-tls"}
 	if err := cli.Get(ctx, nsn, &secret); err != nil {
 		if errors.IsNotFound(err) {
-			return meta, nil
+			return metaFromCache(version)
 		}
 		return nil, fmt.Errorf("failed to get registry tls secret: %w", err)
 	}
 
-	updated, err := configureRegistryTLS(meta)
+	updatedMeta, err := configureRegistryTLS(meta)
 	if err != nil {
 		return nil, fmt.Errorf("failed to configure registry tls: %w", err)
 	}
-	meta = updated
-
-	cache[version] = meta
+	cache[version] = updatedMeta
 	return metaFromCache(version)
 }
 

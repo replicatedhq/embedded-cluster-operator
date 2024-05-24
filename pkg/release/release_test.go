@@ -47,7 +47,7 @@ func Test_localMetadataFor(t *testing.T) {
 				cli: fake.NewClientBuilder().WithObjects(
 					&corev1.ConfigMap{
 						ObjectMeta: metav1.ObjectMeta{
-							Name:      "version-metadata-1-0-0",
+							Name:      "version-metadata-no-tls",
 							Namespace: "embedded-cluster",
 						},
 						Data: map[string]string{
@@ -55,7 +55,7 @@ func Test_localMetadataFor(t *testing.T) {
 						},
 					},
 				).Build(),
-				version: "v1.0.0",
+				version: "no-tls",
 			},
 			want: &ectypes.ReleaseMetadata{
 				Versions: map[string]string{
@@ -77,7 +77,7 @@ func Test_localMetadataFor(t *testing.T) {
 				cli: fake.NewClientBuilder().WithObjects(
 					&corev1.ConfigMap{
 						ObjectMeta: metav1.ObjectMeta{
-							Name:      "version-metadata-1-0-0",
+							Name:      "version-metadata-with-tls",
 							Namespace: "embedded-cluster",
 						},
 						Data: map[string]string{
@@ -91,7 +91,7 @@ func Test_localMetadataFor(t *testing.T) {
 						},
 					},
 				).Build(),
-				version: "v1.0.0",
+				version: "with-tls",
 			},
 			want: &ectypes.ReleaseMetadata{
 				Versions: map[string]string{

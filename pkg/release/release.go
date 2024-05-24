@@ -71,19 +71,6 @@ func MetadataFor(ctx context.Context, in *v1beta1.Installation, cli client.Clien
 	if err != nil {
 		return nil, fmt.Errorf("failed to get local metadata: %w", err)
 	}
-
-	var secret corev1.Secret
-	nsn := types.NamespacedName{Namespace: "registry", Name: "registry-tls"}
-	if err = cli.Get(ctx, nsn, &secret); err != nil {
-		if errors.IsNotFound(err) {
-			return meta, nil
-		}
-		return nil, fmt.Errorf("failed to get registry tls secret: %w", err)
-	}
-
-	if meta, err = configureRegistryTLS(meta); err != nil {
-		return nil, fmt.Errorf("failed to configure registry tls: %w", err)
-	}
 	return meta, nil
 }
 
@@ -108,11 +95,27 @@ func localMetadataFor(ctx context.Context, cli client.Client, version string) (*
 		return nil, fmt.Errorf("metadata.json not found in config map %q", nsn.Name)
 	}
 
-	var meta ectypes.ReleaseMetadata
-	if err := json.Unmarshal([]byte(data), &meta); err != nil {
+	meta := &ectypes.ReleaseMetadata{}
+	if err := json.Unmarshal([]byte(data), meta); err != nil {
 		return nil, fmt.Errorf("failed to decode bundle: %w", err)
 	}
-	cache[version] = &meta
+
+	var secret corev1.Secret
+	nsn = types.NamespacedName{Namespace: "registry", Name: "registry-tls"}
+	if err := cli.Get(ctx, nsn, &secret); err != nil {
+		if errors.IsNotFound(err) {
+			return meta, nil
+		}
+		return nil, fmt.Errorf("failed to get registry tls secret: %w", err)
+	}
+
+	updated, err := configureRegistryTLS(meta)
+	if err != nil {
+		return nil, fmt.Errorf("failed to configure registry tls: %w", err)
+	}
+	meta = updated
+
+	cache[version] = meta
 	return metaFromCache(version)
 }
 

@@ -10,13 +10,13 @@ require (
 	github.com/k0sproject/k0s v1.28.10-0.20240418084644-c99e4b437507
 	github.com/k0sproject/version v0.6.0
 	github.com/ohler55/ojg v1.22.0
-	github.com/onsi/ginkgo/v2 v2.17.2
+	github.com/onsi/ginkgo/v2 v2.17.3
 	github.com/onsi/gomega v1.33.1
-	github.com/replicatedhq/embedded-cluster-kinds v1.2.1
+	github.com/replicatedhq/embedded-cluster-kinds v1.2.2
 	github.com/stretchr/testify v1.9.0
-	k8s.io/api v0.30.0
-	k8s.io/apimachinery v0.30.0
-	k8s.io/client-go v0.30.0
+	k8s.io/api v0.30.1
+	k8s.io/apimachinery v0.30.1
+	k8s.io/client-go v0.30.1
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 	oras.land/oras-go/v2 v2.5.0
 	sigs.k8s.io/controller-runtime v0.18.2

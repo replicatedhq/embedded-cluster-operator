@@ -60,21 +60,17 @@ func configureRegistryTLS(meta *ectypes.ReleaseMetadata) (*ectypes.ReleaseMetada
 }
 
 // MetadataFor determines from where to read the metadata (from the cluster or remotely) and calls
-// the appropriate function. If running on airgap environment this function also assess if the
-// registry requires tls or not and customize the release metadata accordingly.
+// the appropriate function.
 func MetadataFor(ctx context.Context, in *v1beta1.Installation, cli client.Client) (*ectypes.ReleaseMetadata, error) {
-	if !in.Spec.AirGap {
-		return remoteMetadataFor(ctx, in.Spec.Config.Version, in.Spec.MetricsBaseURL)
+	if in.Spec.AirGap {
+		return localMetadataFor(ctx, cli, in.Spec.Config.Version)
 	}
-
-	meta, err := localMetadataFor(ctx, cli, in.Spec.Config.Version)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get local metadata: %w", err)
-	}
-	return meta, nil
+	return remoteMetadataFor(ctx, in.Spec.Config.Version, in.Spec.MetricsBaseURL)
 }
 
 // localMetadataFor reads metadata for a given release. Attempts to read a local config map.
+// If running on airgap environment this function also assess if the registry requires
+// tls or not and customize the release metadata accordingly.
 func localMetadataFor(ctx context.Context, cli client.Client, version string) (*ectypes.ReleaseMetadata, error) {
 	mutex.Lock()
 	defer mutex.Unlock()

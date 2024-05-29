@@ -151,6 +151,22 @@ var copyHostPreflightResultsJob = &batchv1.Job{
 					{
 						Name:  "embedded-cluster-updater",
 						Image: "busybox:latest",
+						Command: []string{
+							"/bin/sh",
+							"-e",
+							"-c",
+							"export KCTL=/var/lib/embedded-cluster/bin/kubectl\n" +
+							"if [ -f /var/lib/embedded-cluster/support/host-preflight-results.json ]; " +
+							"then " +
+								"${KCTL} create configmap ${EC_NODE_NAME}-host-preflight-results " +
+								"--from-file=results.json=/var/lib/embedded-cluster/support/host-preflight-results.json " +
+								"-n embedded-cluster --dry-run=client -oyaml | " +
+								"${KCTL} label -f - embedded-cluster/host-preflight-result=${EC_NODE_NAME} --local -o yaml | " +
+								"${KCTL} apply -f -; " +
+							"else " +
+								"echo '/var/lib/embedded-cluster/support/host-preflight-results.json does not exist'; " +
+							"fi",
+						},
 						VolumeMounts: []corev1.VolumeMount{
 							{
 								Name:      "host",
@@ -1012,23 +1028,7 @@ func (r *InstallationReconciler) CopyHostPreflightResultsFromNodes(ctx context.C
 	for _, event := range events.NodesAdded {
 		log.Info("Creating job to copy host preflight results from node", "node", event.NodeName, "installation", in.Name)
 
-		labels := map[string]string{
-			"embedded-cluster/node-name":    event.NodeName,
-			"embedded-cluster/installation": in.Name,
-		}
-		createConfigMapCmd := constructCreateCMCommand(event.NodeName)
-
-		job := copyHostPreflightResultsJob.DeepCopy()
-		job.Name = util.NameWithLengthLimit(copyHostPreflightResultsJobPrefix, event.NodeName)
-
-		job.Spec.Template.Labels, job.Labels = labels, labels
-		job.Spec.Template.Spec.NodeName = event.NodeName
-		job.Spec.Template.Spec.Containers[0].Command = []string{
-			"/bin/sh",
-			"-e",
-			"-c",
-			createConfigMapCmd,
-		}
+		job := constructHostPreflightResultsJob(event.NodeName, in.Name)
 
 		// overrides the job image if the environment says so.
 		if img := os.Getenv("EMBEDDEDCLUSTER_UTILS_IMAGE"); img != "" {
@@ -1044,16 +1044,23 @@ func (r *InstallationReconciler) CopyHostPreflightResultsFromNodes(ctx context.C
 	return nil
 }
 
-func constructCreateCMCommand(nodeName string) string {
-	cmName := util.NameWithLengthLimit(nodeName, "-host-preflight-results")
-	kubectlCmd := "/var/lib/embedded-cluster/bin/kubectl"
-	labels := fmt.Sprintf(`%s label -f - embedded-cluster/host-preflight-result=%s --local -o yaml`, kubectlCmd, nodeName)
-	resultsFile := "/var/lib/embedded-cluster/support/host-preflight-results.json"
-	cmd := fmt.Sprintf(
-		`%s create configmap %s --from-file=results.json=%s -n %s --dry-run=client -oyaml | %s | %s apply -f -`,
-		kubectlCmd, cmName, resultsFile, ecNamespace, labels, kubectlCmd)
+func constructHostPreflightResultsJob(nodeName, installationName string) *batchv1.Job {
+	labels := map[string]string{
+		"embedded-cluster/node-name":    nodeName,
+		"embedded-cluster/installation": installationName,
+	}
 
-	return fmt.Sprintf("if [ -f %s ]; then %s; else echo '%s does not exist'; fi", resultsFile, cmd, resultsFile)
+	job := copyHostPreflightResultsJob.DeepCopy()
+	job.Name = util.NameWithLengthLimit(copyHostPreflightResultsJobPrefix, nodeName)
+
+	job.Spec.Template.Labels, job.Labels = labels, labels
+	job.Spec.Template.Spec.NodeName = nodeName
+	job.Spec.Template.Spec.Containers[0].Env = append(
+		job.Spec.Template.Spec.Containers[0].Env,
+		corev1.EnvVar{Name: "EC_NODE_NAME", Value: nodeName},
+	)
+
+	return job
 }
 
 //+kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch

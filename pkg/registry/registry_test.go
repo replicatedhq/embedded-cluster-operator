@@ -13,6 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -55,6 +56,11 @@ func Test_ensureSeaweedfsS3Secret(t *testing.T) {
 				secret := &corev1.Secret{}
 				err = cli.Get(context.Background(), client.ObjectKey{Namespace: "seaweedfs", Name: "secret-seaweedfs-s3"}, secret)
 				require.NoError(t, err)
+
+				if assert.Len(t, secret.OwnerReferences, 1) {
+					assert.Equal(t, secret.OwnerReferences[0].Name, "embedded-cluster-kinds")
+				}
+
 				assert.Contains(t, secret.Data, "seaweedfs_s3_config")
 			},
 		},
@@ -96,6 +102,11 @@ func Test_ensureSeaweedfsS3Secret(t *testing.T) {
 				secret := &corev1.Secret{}
 				err = cli.Get(context.Background(), client.ObjectKey{Namespace: "seaweedfs", Name: "secret-seaweedfs-s3"}, secret)
 				require.NoError(t, err)
+
+				if assert.Len(t, secret.OwnerReferences, 1) {
+					assert.Equal(t, secret.OwnerReferences[0].Name, "embedded-cluster-kinds")
+				}
+
 				assert.Contains(t, secret.Data, "seaweedfs_s3_config")
 			},
 		},
@@ -123,8 +134,9 @@ func Test_ensureSeaweedfsS3Secret(t *testing.T) {
 				},
 				&corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "seaweedfs",
-						Name:      "secret-seaweedfs-s3",
+						Namespace:       "seaweedfs",
+						Name:            "secret-seaweedfs-s3",
+						OwnerReferences: []metav1.OwnerReference{ownerReference()},
 					},
 					Data: map[string][]byte{
 						"seaweedfs_s3_config": []byte(`{"identities":[` +
@@ -143,6 +155,11 @@ func Test_ensureSeaweedfsS3Secret(t *testing.T) {
 				secret := &corev1.Secret{}
 				err = cli.Get(context.Background(), client.ObjectKey{Namespace: "seaweedfs", Name: "secret-seaweedfs-s3"}, secret)
 				require.NoError(t, err)
+
+				if assert.Len(t, secret.OwnerReferences, 1) {
+					assert.Equal(t, secret.OwnerReferences[0].Name, "embedded-cluster-kinds")
+				}
+
 				if assert.Contains(t, secret.Data, "seaweedfs_s3_config") {
 					assert.Equal(t, `{"identities":[`+
 						`{"name":"anvAdmin","credentials":[{"accessKey":"Ik1yeEVtWVgHFJGQnsCu","secretKey":"5U1QVkIxBhsQnmxRRHeqR1NqOLe4VEtX53Xc5vQt"}],"actions":["Admin","Read","Write"]},`+
@@ -155,9 +172,21 @@ func Test_ensureSeaweedfsS3Secret(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cli := fake.NewClientBuilder().WithRuntimeObjects(tt.initRuntimeObjs...).Build()
+			cli := fake.NewClientBuilder().
+				WithScheme(scheme(t)).
+				WithRuntimeObjects(tt.initRuntimeObjs...).
+				Build()
 
-			_, gotOp, err := ensureSeaweedfsS3Secret(context.Background(), tt.args.metadata, cli)
+			_, gotOp, err := ensureSeaweedfsS3Secret(context.Background(), &clusterv1beta1.Installation{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: clusterv1beta1.GroupVersion.String(),
+					Kind:       "Installation",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "embedded-cluster-kinds",
+					Generation: int64(2),
+				},
+			}, tt.args.metadata, cli)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -221,6 +250,11 @@ func Test_ensureRegistryS3Secret(t *testing.T) {
 				secret := &corev1.Secret{}
 				err = cli.Get(context.Background(), client.ObjectKey{Namespace: "registry", Name: "seaweedfs-s3-rw"}, secret)
 				require.NoError(t, err)
+
+				if assert.Len(t, secret.OwnerReferences, 1) {
+					assert.Equal(t, secret.OwnerReferences[0].Name, "embedded-cluster-kinds")
+				}
+
 				if assert.Contains(t, secret.Data, "s3AccessKey") {
 					assert.Equal(t, "ACCESSKEY", string(secret.Data["s3AccessKey"]))
 				}
@@ -280,6 +314,11 @@ func Test_ensureRegistryS3Secret(t *testing.T) {
 				secret := &corev1.Secret{}
 				err = cli.Get(context.Background(), client.ObjectKey{Namespace: "registry", Name: "seaweedfs-s3-rw"}, secret)
 				require.NoError(t, err)
+
+				if assert.Len(t, secret.OwnerReferences, 1) {
+					assert.Equal(t, secret.OwnerReferences[0].Name, "embedded-cluster-kinds")
+				}
+
 				if assert.Contains(t, secret.Data, "s3AccessKey") {
 					assert.Equal(t, "ACCESSKEY", string(secret.Data["s3AccessKey"]))
 				}
@@ -325,8 +364,9 @@ func Test_ensureRegistryS3Secret(t *testing.T) {
 				},
 				&corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "registry",
-						Name:      "seaweedfs-s3-rw",
+						Namespace:       "registry",
+						Name:            "seaweedfs-s3-rw",
+						OwnerReferences: []metav1.OwnerReference{ownerReference()},
 					},
 					Data: map[string][]byte{
 						"s3AccessKey": []byte("ACCESSKEY"),
@@ -343,6 +383,11 @@ func Test_ensureRegistryS3Secret(t *testing.T) {
 				secret := &corev1.Secret{}
 				err = cli.Get(context.Background(), client.ObjectKey{Namespace: "registry", Name: "seaweedfs-s3-rw"}, secret)
 				require.NoError(t, err)
+
+				if assert.Len(t, secret.OwnerReferences, 1) {
+					assert.Equal(t, secret.OwnerReferences[0].Name, "embedded-cluster-kinds")
+				}
+
 				if assert.Contains(t, secret.Data, "s3AccessKey") {
 					assert.Equal(t, "ACCESSKEY", string(secret.Data["s3AccessKey"]))
 				}
@@ -354,9 +399,21 @@ func Test_ensureRegistryS3Secret(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cli := fake.NewClientBuilder().WithRuntimeObjects(tt.initRuntimeObjs...).Build()
+			cli := fake.NewClientBuilder().
+				WithScheme(scheme(t)).
+				WithRuntimeObjects(tt.initRuntimeObjs...).
+				Build()
 
-			gotOp, err := ensureRegistryS3Secret(context.Background(), tt.args.metadata, cli, tt.args.sfsConfig)
+			gotOp, err := ensureRegistryS3Secret(context.Background(), &clusterv1beta1.Installation{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: clusterv1beta1.GroupVersion.String(),
+					Kind:       "Installation",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "embedded-cluster-kinds",
+					Generation: int64(2),
+				},
+			}, tt.args.metadata, cli, tt.args.sfsConfig)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -386,7 +443,12 @@ func TestEnsureSecrets(t *testing.T) {
 			name: "basic",
 			args: args{
 				in: &clusterv1beta1.Installation{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: clusterv1beta1.GroupVersion.String(),
+						Kind:       "Installation",
+					},
 					ObjectMeta: metav1.ObjectMeta{
+						Name:       "embedded-cluster-kinds",
 						Generation: int64(2),
 					},
 					Status: clusterv1beta1.InstallationStatus{
@@ -468,6 +530,11 @@ func TestEnsureSecrets(t *testing.T) {
 				secret := &corev1.Secret{}
 				err = cli.Get(context.Background(), client.ObjectKey{Namespace: "seaweedfs", Name: "secret-seaweedfs-s3"}, secret)
 				require.NoError(t, err)
+
+				if assert.Len(t, secret.OwnerReferences, 1) {
+					assert.Equal(t, secret.OwnerReferences[0].Name, "embedded-cluster-kinds")
+				}
+
 				if assert.Contains(t, secret.Data, "seaweedfs_s3_config") {
 					assert.Equal(t, `{"identities":[`+
 						`{"name":"anvAdmin","credentials":[{"accessKey":"Ik1yeEVtWVgHFJGQnsCu","secretKey":"5U1QVkIxBhsQnmxRRHeqR1NqOLe4VEtX53Xc5vQt"}],"actions":["Admin","Read","Write"]},`+
@@ -483,6 +550,11 @@ func TestEnsureSecrets(t *testing.T) {
 				secret = &corev1.Secret{}
 				err = cli.Get(context.Background(), client.ObjectKey{Namespace: "registry", Name: "seaweedfs-s3-rw"}, secret)
 				require.NoError(t, err)
+
+				if assert.Len(t, secret.OwnerReferences, 1) {
+					assert.Equal(t, secret.OwnerReferences[0].Name, "embedded-cluster-kinds")
+				}
+
 				if assert.Contains(t, secret.Data, "s3AccessKey") {
 					assert.Equal(t, "Ik1yeEVtWVgHFJGQnsCu", string(secret.Data["s3AccessKey"]))
 				}
@@ -494,7 +566,10 @@ func TestEnsureSecrets(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cli := fake.NewClientBuilder().WithRuntimeObjects(tt.initRuntimeObjs...).Build()
+			cli := fake.NewClientBuilder().
+				WithScheme(scheme(t)).
+				WithRuntimeObjects(tt.initRuntimeObjs...).
+				Build()
 
 			err := EnsureSecrets(context.Background(), tt.args.in, tt.args.metadata, cli)
 			if tt.wantErr {
@@ -506,4 +581,24 @@ func TestEnsureSecrets(t *testing.T) {
 			tt.assertRuntime(t, cli)
 		})
 	}
+}
+
+func ownerReference() metav1.OwnerReference {
+	return metav1.OwnerReference{
+		APIVersion:         clusterv1beta1.GroupVersion.String(),
+		Kind:               "Installation",
+		Name:               "embedded-cluster-kinds",
+		UID:                "",
+		BlockOwnerDeletion: ptr.To(true),
+		Controller:         ptr.To(true),
+	}
+}
+
+func scheme(t *testing.T) *runtime.Scheme {
+	scheme := runtime.NewScheme()
+	err := corev1.AddToScheme(scheme)
+	require.NoError(t, err)
+	err = clusterv1beta1.SchemeBuilder.AddToScheme(scheme)
+	require.NoError(t, err)
+	return scheme
 }

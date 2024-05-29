@@ -1089,10 +1089,10 @@ func (r *InstallationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 func (r *InstallationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1beta1.Installation{}).
+		Owns(&corev1.Secret{}).
 		Watches(&corev1.Node{}, &handler.EnqueueRequestForObject{}).
 		Watches(&apv1b2.Plan{}, &handler.EnqueueRequestForObject{}).
 		Watches(&k0shelm.Chart{}, &handler.EnqueueRequestForObject{}).
 		Watches(&batchv1.Job{}, &handler.EnqueueRequestForObject{}).
-		Watches(&corev1.Secret{}, &handler.EnqueueRequestForObject{}). // can we watch a specific namespace or namespaces?
 		Complete(r)
 }

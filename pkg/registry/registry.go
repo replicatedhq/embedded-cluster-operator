@@ -30,7 +30,7 @@ const (
 func EnsureSecrets(ctx context.Context, in *clusterv1beta1.Installation, metadata *ectypes.ReleaseMetadata, cli client.Client) error {
 	log := ctrl.LoggerFrom(ctx)
 
-	config, op, err := ensureSeaweedfsS3Secret(ctx, metadata, cli)
+	config, op, err := ensureSeaweedfsS3Secret(ctx, in, metadata, cli)
 	if err != nil {
 		in.Status.SetCondition(metav1.Condition{
 			Type:               SeaweedfsS3SecretReadyConditionType,
@@ -50,7 +50,7 @@ func EnsureSecrets(ctx context.Context, in *clusterv1beta1.Installation, metadat
 		ObservedGeneration: in.Generation,
 	})
 
-	op, err = ensureRegistryS3Secret(ctx, metadata, cli, config)
+	op, err = ensureRegistryS3Secret(ctx, in, metadata, cli, config)
 	if err != nil {
 		in.Status.SetCondition(metav1.Condition{
 			Type:               RegistryS3SecretReadyConditionType,
@@ -73,7 +73,7 @@ func EnsureSecrets(ctx context.Context, in *clusterv1beta1.Installation, metadat
 	return nil
 }
 
-func ensureSeaweedfsS3Secret(ctx context.Context, metadata *ectypes.ReleaseMetadata, cli client.Client) (*seaweedfsConfig, controllerutil.OperationResult, error) {
+func ensureSeaweedfsS3Secret(ctx context.Context, in *clusterv1beta1.Installation, metadata *ectypes.ReleaseMetadata, cli client.Client) (*seaweedfsConfig, controllerutil.OperationResult, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	op := controllerutil.OperationResultNone
@@ -100,6 +100,11 @@ func ensureSeaweedfsS3Secret(ctx context.Context, metadata *ectypes.ReleaseMetad
 	var config seaweedfsConfig
 
 	op, err = ctrl.CreateOrUpdate(ctx, cli, obj, func() error {
+		err := ctrl.SetControllerReference(in, obj, cli.Scheme())
+		if err != nil {
+			return fmt.Errorf("set controller reference: %w", err)
+		}
+
 		if obj.Data != nil {
 			err := json.Unmarshal(obj.Data["seaweedfs_s3_config"], &config)
 			if err != nil {
@@ -167,7 +172,7 @@ func ensureSeaweedfsNamespace(ctx context.Context, cli client.Client, namespace 
 	return nil
 }
 
-func ensureRegistryS3Secret(ctx context.Context, metadata *ectypes.ReleaseMetadata, cli client.Client, sfsConfig *seaweedfsConfig) (controllerutil.OperationResult, error) {
+func ensureRegistryS3Secret(ctx context.Context, in *clusterv1beta1.Installation, metadata *ectypes.ReleaseMetadata, cli client.Client, sfsConfig *seaweedfsConfig) (controllerutil.OperationResult, error) {
 	op := controllerutil.OperationResultNone
 
 	sfsCreds, ok := sfsConfig.getCredentials("anvAdmin")
@@ -195,6 +200,11 @@ func ensureRegistryS3Secret(ctx context.Context, metadata *ectypes.ReleaseMetada
 	}
 
 	op, err = ctrl.CreateOrUpdate(ctx, cli, obj, func() error {
+		err := ctrl.SetControllerReference(in, obj, cli.Scheme())
+		if err != nil {
+			return fmt.Errorf("set controller reference: %w", err)
+		}
+
 		if obj.Data == nil {
 			obj.Data = make(map[string][]byte)
 		}

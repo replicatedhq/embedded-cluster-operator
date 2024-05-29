@@ -9,6 +9,7 @@ import (
 	"github.com/replicatedhq/embedded-cluster-kinds/apis/v1beta1"
 	ectypes "github.com/replicatedhq/embedded-cluster-kinds/types"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/release"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -904,4 +905,10 @@ password: original`,
 			}
 		})
 	}
+}
+
+func TestInstallationReconciler_constructCreateCMCommand(t *testing.T) {
+	cmd := constructCreateCMCommand("my-node")
+	expected := "if [ -f /var/lib/embedded-cluster/support/host-preflight-results.json ]; then /var/lib/embedded-cluster/bin/kubectl create configmap my-node-host-preflight-results --from-file=results.json=/var/lib/embedded-cluster/support/host-preflight-results.json -n embedded-cluster --dry-run=client -oyaml | /var/lib/embedded-cluster/bin/kubectl label -f - embedded-cluster/host-preflight-result=my-node --local -o yaml | /var/lib/embedded-cluster/bin/kubectl apply -f -; else echo '/var/lib/embedded-cluster/support/host-preflight-results.json does not exist'; fi"
+	assert.Equal(t, expected, cmd)
 }

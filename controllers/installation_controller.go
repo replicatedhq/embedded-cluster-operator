@@ -132,6 +132,8 @@ var copyHostPreflightResultsJob = &batchv1.Job{
 		Namespace: ecNamespace,
 	},
 	Spec: batchv1.JobSpec{
+		BackoffLimit: ptr.To[int32](2),
+		TTLSecondsAfterFinished: ptr.To[int32](0),	// we don't want to keep the job around. Delete immediately after it finishes.
 		Template: corev1.PodTemplateSpec{
 			Spec: corev1.PodSpec{
 				ServiceAccountName: "embedded-cluster-operator",
@@ -155,14 +157,14 @@ var copyHostPreflightResultsJob = &batchv1.Job{
 							"/bin/sh",
 							"-e",
 							"-c",
-							"export KCTL=/var/lib/embedded-cluster/bin/kubectl\n" +
 							"if [ -f /var/lib/embedded-cluster/support/host-preflight-results.json ]; " +
 							"then " +
-								"${KCTL} create configmap ${EC_NODE_NAME}-host-preflight-results " +
+								"/var/lib/embedded-cluster/bin/kubectl create configmap ${EC_NODE_NAME}-host-preflight-results " +
 								"--from-file=results.json=/var/lib/embedded-cluster/support/host-preflight-results.json " +
 								"-n embedded-cluster --dry-run=client -oyaml | " +
-								"${KCTL} label -f - embedded-cluster/host-preflight-result=${EC_NODE_NAME} --local -o yaml | " +
-								"${KCTL} apply -f -; " +
+								"/var/lib/embedded-cluster/bin/kubectl label -f - embedded-cluster/host-preflight-result=${EC_NODE_NAME} --local -o yaml | " +
+								"/var/lib/embedded-cluster/bin/kubectl apply -f - && " +
+								"/var/lib/embedded-cluster/bin/kubectl annotate configmap ${EC_NODE_NAME}-host-preflight-results \"update-timestamp=$(date +'%Y-%m-%dT%H:%M:%SZ')\" --overwrite; " +
 							"else " +
 								"echo '/var/lib/embedded-cluster/support/host-preflight-results.json does not exist'; " +
 							"fi",
@@ -708,7 +710,7 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 
 	combinedConfigs, err = applyUserProvidedAddonOverrides(in, combinedConfigs)
 	if err != nil {
-		return fmt.Errorf("failed to apply user provided overrides: %w:", err)
+		return fmt.Errorf("failed to apply user provided overrides: %w", err)
 	}
 
 	existingHelm := &k0sv1beta1.HelmExtensions{}

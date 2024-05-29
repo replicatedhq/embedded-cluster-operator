@@ -913,7 +913,7 @@ func TestInstallationReconciler_constructCreateCMCommand(t *testing.T) {
 	require.Len(t, job.Spec.Template.Spec.Containers, 1)
 	require.Len(t, job.Spec.Template.Spec.Containers[0].Command, 4)
 	kctlCmd := job.Spec.Template.Spec.Containers[0].Command[3]
-	expected := "export KCTL=/var/lib/embedded-cluster/bin/kubectl\nif [ -f /var/lib/embedded-cluster/support/host-preflight-results.json ]; then ${KCTL} create configmap ${EC_NODE_NAME}-host-preflight-results --from-file=results.json=/var/lib/embedded-cluster/support/host-preflight-results.json -n embedded-cluster --dry-run=client -oyaml | ${KCTL} label -f - embedded-cluster/host-preflight-result=${EC_NODE_NAME} --local -o yaml | ${KCTL} apply -f -; else echo '/var/lib/embedded-cluster/support/host-preflight-results.json does not exist'; fi"
+	expected := "if [ -f /var/lib/embedded-cluster/support/host-preflight-results.json ]; then /var/lib/embedded-cluster/bin/kubectl create configmap ${EC_NODE_NAME}-host-preflight-results --from-file=results.json=/var/lib/embedded-cluster/support/host-preflight-results.json -n embedded-cluster --dry-run=client -oyaml | /var/lib/embedded-cluster/bin/kubectl label -f - embedded-cluster/host-preflight-result=${EC_NODE_NAME} --local -o yaml | /var/lib/embedded-cluster/bin/kubectl apply -f - && /var/lib/embedded-cluster/bin/kubectl annotate configmap ${EC_NODE_NAME}-host-preflight-results \"update-timestamp=$(date +'%Y-%m-%dT%H:%M:%SZ')\" --overwrite; else echo '/var/lib/embedded-cluster/support/host-preflight-results.json does not exist'; fi"
 	assert.Equal(t, expected, kctlCmd)
 	assert.Equal(t, v1.EnvVar{
 		Name:  "EC_NODE_NAME",

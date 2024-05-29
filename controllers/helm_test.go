@@ -13,8 +13,9 @@ import (
 
 func Test_mergeHelmConfigs(t *testing.T) {
 	type args struct {
-		meta *ectypes.ReleaseMetadata
-		in   v1beta1.Extensions
+		meta      *ectypes.ReleaseMetadata
+		in        v1beta1.Extensions
+		haEnabled bool
 	}
 	tests := []struct {
 		name             string
@@ -221,6 +222,95 @@ func Test_mergeHelmConfigs(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "ha enabled",
+			args: args{
+				meta: &ectypes.ReleaseMetadata{
+					Configs: k0sv1beta1.HelmExtensions{
+						ConcurrencyLevel: 1,
+						Repositories: []k0sv1beta1.Repository{
+							{
+								Name: "origrepo",
+							},
+						},
+						Charts: []k0sv1beta1.Chart{
+							{
+								Name: "origchart",
+							},
+						},
+					},
+					BuiltinConfigs: map[string]k0sv1beta1.HelmExtensions{
+						"seaweedfs": {
+							Repositories: []k0sv1beta1.Repository{
+								{
+									Name: "seaweedfsrepo",
+								},
+							},
+							Charts: []k0sv1beta1.Chart{
+								{
+									Name: "seaweedfschart",
+									// Values: `{"filer":{"s3":{"existingConfigSecret":"seaweedfs-s3-secret"}}}`,
+								},
+							},
+						},
+						"registry": {
+							Repositories: []k0sv1beta1.Repository{
+								{
+									Name: "registryrepo",
+								},
+							},
+							Charts: []k0sv1beta1.Chart{
+								{
+									Name: "registrychart",
+								},
+							},
+						},
+						"registry-ha": {
+							Repositories: []k0sv1beta1.Repository{
+								{
+									Name: "registryharepo",
+								},
+							},
+							Charts: []k0sv1beta1.Chart{
+								{
+									Name: "registryhachart",
+									// Values: `{"secrets":{"s3":{"secretRef":"registry-s3-secret"}}}`,
+								},
+							},
+						},
+					},
+				},
+				in: v1beta1.Extensions{},
+			},
+			want: &k0sv1beta1.HelmExtensions{
+				ConcurrencyLevel: 1,
+				Repositories: []k0sv1beta1.Repository{
+					{
+						Name: "origrepo",
+					},
+					{
+						Name: "seaweedfsrepo",
+					},
+					{
+						Name: "registryharepo",
+					},
+				},
+				Charts: []k0sv1beta1.Chart{
+					{
+						Name:  "origchart",
+						Order: 100,
+					},
+					{
+						Name:  "seaweedfschart",
+						Order: 100,
+					},
+					{
+						Name:  "registryhachart",
+						Order: 100,
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -238,7 +328,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 			}
 
 			req := require.New(t)
-			got := mergeHelmConfigs(context.TODO(), tt.args.meta, &installation)
+			got := mergeHelmConfigs(context.TODO(), tt.args.meta, &installation, tt.args.haEnabled)
 			req.Equal(tt.want, got)
 		})
 	}

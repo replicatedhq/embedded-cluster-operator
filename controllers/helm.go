@@ -68,7 +68,7 @@ func mergeHelmConfigs(ctx context.Context, meta *ectypes.ReleaseMetadata, in *v1
 	}
 
 	if in != nil && in.Spec.AirGap {
-		if in.Spec.IsHighAvailability {
+		if in.Spec.HighAvailability {
 			seaweedfsConfig, ok := meta.BuiltinConfigs["seaweedfs"]
 			if ok {
 				combinedConfigs.Charts = append(combinedConfigs.Charts, seaweedfsConfig.Charts...)

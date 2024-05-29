@@ -424,16 +424,8 @@ func TestEnsureSecrets(t *testing.T) {
 		{
 			name: "basic",
 			args: args{
-				in: &clusterv1beta1.Installation{
-					TypeMeta: metav1.TypeMeta{
-						APIVersion: clusterv1beta1.GroupVersion.String(),
-						Kind:       "Installation",
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Name:       "embedded-cluster-kinds",
-						Generation: int64(2),
-					},
-					Status: clusterv1beta1.InstallationStatus{
+				in: installation(func(in *clusterv1beta1.Installation) {
+					in.Status = clusterv1beta1.InstallationStatus{
 						Conditions: []metav1.Condition{
 							{
 								Type:               SeaweedfsS3SecretReadyConditionType,
@@ -443,8 +435,8 @@ func TestEnsureSecrets(t *testing.T) {
 								LastTransitionTime: metav1.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC),
 							},
 						},
-					},
-				},
+					}
+				}),
 				metadata: &ectypes.ReleaseMetadata{
 					BuiltinConfigs: map[string]k0sv1beta1.HelmExtensions{
 						"seaweedfs": {
@@ -565,8 +557,8 @@ func TestEnsureSecrets(t *testing.T) {
 	}
 }
 
-func installation() *clusterv1beta1.Installation {
-	return &clusterv1beta1.Installation{
+func installation(options ...func(*clusterv1beta1.Installation)) *clusterv1beta1.Installation {
+	in := &clusterv1beta1.Installation{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: clusterv1beta1.GroupVersion.String(),
 			Kind:       "Installation",
@@ -576,6 +568,10 @@ func installation() *clusterv1beta1.Installation {
 			Generation: int64(2),
 		},
 	}
+	for _, option := range options {
+		option(in)
+	}
+	return in
 }
 
 func ownerReference() metav1.OwnerReference {

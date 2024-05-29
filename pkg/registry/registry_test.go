@@ -177,16 +177,7 @@ func Test_ensureSeaweedfsS3Secret(t *testing.T) {
 				WithRuntimeObjects(tt.initRuntimeObjs...).
 				Build()
 
-			_, gotOp, err := ensureSeaweedfsS3Secret(context.Background(), &clusterv1beta1.Installation{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: clusterv1beta1.GroupVersion.String(),
-					Kind:       "Installation",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name:       "embedded-cluster-kinds",
-					Generation: int64(2),
-				},
-			}, tt.args.metadata, cli)
+			_, gotOp, err := ensureSeaweedfsS3Secret(context.Background(), installation(), tt.args.metadata, cli)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -404,16 +395,7 @@ func Test_ensureRegistryS3Secret(t *testing.T) {
 				WithRuntimeObjects(tt.initRuntimeObjs...).
 				Build()
 
-			gotOp, err := ensureRegistryS3Secret(context.Background(), &clusterv1beta1.Installation{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: clusterv1beta1.GroupVersion.String(),
-					Kind:       "Installation",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name:       "embedded-cluster-kinds",
-					Generation: int64(2),
-				},
-			}, tt.args.metadata, cli, tt.args.sfsConfig)
+			gotOp, err := ensureRegistryS3Secret(context.Background(), installation(), tt.args.metadata, cli, tt.args.sfsConfig)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -583,12 +565,26 @@ func TestEnsureSecrets(t *testing.T) {
 	}
 }
 
+func installation() *clusterv1beta1.Installation {
+	return &clusterv1beta1.Installation{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: clusterv1beta1.GroupVersion.String(),
+			Kind:       "Installation",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "embedded-cluster-kinds",
+			Generation: int64(2),
+		},
+	}
+}
+
 func ownerReference() metav1.OwnerReference {
+	in := installation()
 	return metav1.OwnerReference{
 		APIVersion:         clusterv1beta1.GroupVersion.String(),
 		Kind:               "Installation",
-		Name:               "embedded-cluster-kinds",
-		UID:                "",
+		Name:               in.GetName(),
+		UID:                in.GetUID(),
 		BlockOwnerDeletion: ptr.To(true),
 		Controller:         ptr.To(true),
 	}

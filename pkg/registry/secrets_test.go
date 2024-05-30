@@ -425,6 +425,7 @@ func TestEnsureSecrets(t *testing.T) {
 			name: "basic",
 			args: args{
 				in: installation(func(in *clusterv1beta1.Installation) {
+					in.Spec.AirGap = true
 					in.Spec.HighAvailability = true
 					in.Status = clusterv1beta1.InstallationStatus{
 						Conditions: []metav1.Condition{

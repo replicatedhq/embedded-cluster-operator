@@ -75,6 +75,7 @@ func mergeHelmConfigs(ctx context.Context, meta *ectypes.ReleaseMetadata, in *v1
 				combinedConfigs.Repositories = append(combinedConfigs.Repositories, seaweedfsConfig.Repositories...)
 			}
 
+			// TODO: only add registry-ha if the registry-to-seaweed migration has completed
 			registryConfig, ok := meta.BuiltinConfigs["registry-ha"]
 			if ok {
 				combinedConfigs.Charts = append(combinedConfigs.Charts, registryConfig.Charts...)

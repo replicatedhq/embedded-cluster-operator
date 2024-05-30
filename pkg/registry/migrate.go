@@ -99,17 +99,10 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, m
 					},
 					InitContainers: []corev1.Container{
 						{
-							Name:  "scale-down-registry",
-							Image: "bitnami/kubectl:1.29.5", // TODO make this dynamic, ensure it's included in the airgap bundle
-							Command: []string{
-								"kubectl",
-								"scale",
-								"deployment",
-								"registry",
-								"-n",
-								ns,
-								"--replicas=0",
-							},
+							Name:    "scale-down-registry",
+							Image:   "bitnami/kubectl:1.29.5", // TODO make this dynamic, ensure it's included in the airgap bundle
+							Command: []string{"sh", "-c"},
+							Args:    []string{`kubectl scale deployment registry -n ` + ns + ` --replicas=0 || sleep 10000`},
 						},
 						{
 							Name:    "wait-for-seaweed",
@@ -161,18 +154,10 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, m
 					},
 					Containers: []corev1.Container{
 						{
-							Name:  "create-success-secret",
-							Image: "bitnami/kubectl:1.29.5", // TODO make this dynamic, ensure it's included in the airgap bundle
-							Command: []string{
-								"kubectl",
-								"create",
-								"secret",
-								"generic",
-								"-n",
-								ns,
-								registryDataMigrationCompleteSecretName,
-								"--from-literal=registry=migrated",
-							},
+							Name:    "create-success-secret",
+							Image:   "bitnami/kubectl:1.29.5", // TODO make this dynamic, ensure it's included in the airgap bundle
+							Command: []string{"sh", "-c"},
+							Args:    []string{`kubectl create secret generic -n ` + ns + ` ` + registryDataMigrationCompleteSecretName + `--from-literal=registry=migrated  || sleep 10000`},
 						},
 					},
 				},

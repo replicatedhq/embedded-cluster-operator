@@ -5,8 +5,6 @@ import (
 	"fmt"
 
 	clusterv1beta1 "github.com/replicatedhq/embedded-cluster-kinds/apis/v1beta1"
-	ectypes "github.com/replicatedhq/embedded-cluster-kinds/types"
-	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -23,8 +21,8 @@ const RegistryMigrationStatusConditionType = "RegistryMigrationStatus"
 // this function scales down the registry deployment to 0 replicas, then creates a job that will migrate the data before
 // creating a 'migration is complete' secret in the registry namespace
 // if this secret is present, the function will return without reattempting the migration
-func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, metadata *ectypes.ReleaseMetadata, cli client.Client) error {
-	hasMigrated, err := HasRegistryMigrated(ctx, metadata, cli)
+func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, cli client.Client) error {
+	hasMigrated, err := HasRegistryMigrated(ctx, cli)
 	if err != nil {
 		return fmt.Errorf("check if registry has migrated before running migration: %w", err)
 	}
@@ -38,15 +36,10 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, m
 		return nil
 	}
 
-	ns, err := getRegistryNamespaceFromMetadata(metadata)
-	if err != nil {
-		return fmt.Errorf("get registry namespace from metadata: %w", err)
-	}
-
 	// check if the migration is already in progress
 	// if it is, return without reattempting the migration
 	migrationJob := batchv1.Job{}
-	err = cli.Get(ctx, client.ObjectKey{Namespace: ns, Name: registryDataMigrationJobName}, &migrationJob)
+	err = cli.Get(ctx, client.ObjectKey{Namespace: RegistryNamespace, Name: registryDataMigrationJobName}, &migrationJob)
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			return fmt.Errorf("get migration job: %w", err)
@@ -68,16 +61,11 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, m
 		return nil
 	}
 
-	registryS3CredsSecret, err := getRegistryS3SecretNameFromMetadata(metadata)
-	if err != nil {
-		return fmt.Errorf("get registry s3 secret name from metadata: %w", err)
-	}
-
 	// create the migration job
 	migrationJob = batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      registryDataMigrationJobName,
-			Namespace: ns,
+			Namespace: RegistryNamespace,
 		},
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Job",
@@ -102,7 +90,7 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, m
 							Name:    "scale-down-registry",
 							Image:   "bitnami/kubectl:1.29.5", // TODO make this dynamic, ensure it's included in the airgap bundle
 							Command: []string{"sh", "-c"},
-							Args:    []string{`kubectl scale deployment registry -n ` + ns + ` --replicas=0 || sleep 10000`},
+							Args:    []string{`kubectl scale deployment registry -n ` + RegistryNamespace + ` --replicas=0 || sleep 10000`},
 						},
 						{
 							Name:    "wait-for-seaweed",
@@ -119,7 +107,7 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, m
 								{
 									SecretRef: &corev1.SecretEnvSource{
 										LocalObjectReference: corev1.LocalObjectReference{
-											Name: registryS3CredsSecret,
+											Name: RegistryS3SecretName,
 										},
 									},
 								},
@@ -145,7 +133,7 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, m
 								{
 									SecretRef: &corev1.SecretEnvSource{
 										LocalObjectReference: corev1.LocalObjectReference{
-											Name: registryS3CredsSecret,
+											Name: RegistryS3SecretName,
 										},
 									},
 								},
@@ -157,7 +145,7 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, m
 							Name:    "create-success-secret",
 							Image:   "bitnami/kubectl:1.29.5", // TODO make this dynamic, ensure it's included in the airgap bundle
 							Command: []string{"sh", "-c"},
-							Args:    []string{`kubectl create secret generic -n ` + ns + ` ` + registryDataMigrationCompleteSecretName + `--from-literal=registry=migrated  || sleep 10000`},
+							Args:    []string{`kubectl create secret generic -n ` + RegistryNamespace + ` ` + registryDataMigrationCompleteSecretName + `--from-literal=registry=migrated  || sleep 10000`},
 						},
 					},
 				},
@@ -184,35 +172,10 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, m
 	return nil
 }
 
-// scaleDownRegistry scales the 'registry' deployment in the provided namespace to 0 replicas.
-// if it does not exist, that is an error.
-func scaleDownRegistry(ctx context.Context, ns string, cli client.Client) error {
-	registryDeployment := appsv1.Deployment{}
-	err := cli.Get(ctx, client.ObjectKey{Namespace: ns, Name: "registry"}, &registryDeployment)
-	if err != nil {
-		return fmt.Errorf("get registry deployment: %w", err)
-	}
-
-	zeroVar := int32(0)
-
-	registryDeployment.Spec.Replicas = &zeroVar
-	err = cli.Update(ctx, &registryDeployment)
-	if err != nil {
-		return fmt.Errorf("update registry deployment: %w", err)
-	}
-
-	return nil
-}
-
 // HasRegistryMigrated checks if the registry data has been migrated by looking for the 'migration complete' secret in the registry namespace
-func HasRegistryMigrated(ctx context.Context, metadata *ectypes.ReleaseMetadata, cli client.Client) (bool, error) {
-	ns, err := getRegistryNamespaceFromMetadata(metadata)
-	if err != nil {
-		return false, fmt.Errorf("get registry namespace from metadata: %w", err)
-	}
-
+func HasRegistryMigrated(ctx context.Context, cli client.Client) (bool, error) {
 	sec := corev1.Secret{}
-	err = cli.Get(ctx, client.ObjectKey{Namespace: ns, Name: registryDataMigrationCompleteSecretName}, &sec)
+	err := cli.Get(ctx, client.ObjectKey{Namespace: RegistryNamespace, Name: registryDataMigrationCompleteSecretName}, &sec)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return false, nil

@@ -6,6 +6,7 @@ import (
 
 	clusterv1beta1 "github.com/replicatedhq/embedded-cluster-kinds/apis/v1beta1"
 	ectypes "github.com/replicatedhq/embedded-cluster-kinds/types"
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -67,7 +68,10 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, m
 		return nil
 	}
 
-	// TODO: scale down the existing registry deployment
+	err = scaleDownRegistry(ctx, ns, cli)
+	if err != nil {
+		return fmt.Errorf("scale down registry deployment: %w", err)
+	}
 
 	registryS3CredsSecret, err := getRegistryS3SecretNameFromMetadata(metadata)
 	if err != nil {
@@ -92,7 +96,7 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, m
 							Name: "registry-data",
 							VolumeSource: corev1.VolumeSource{
 								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-									ClaimName: "TODO-GET-REGISTRY-PVC-NAME",
+									ClaimName: "registry", // yes it's really just called "registry"
 								},
 							},
 						},
@@ -146,6 +150,26 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, m
 		Reason:             "MigrationJobInProgress",
 		ObservedGeneration: in.Generation,
 	})
+
+	return nil
+}
+
+// scaleDownRegistry scales the 'registry' deployment in the provided namespace to 0 replicas.
+// if it does not exist, that is an error.
+func scaleDownRegistry(ctx context.Context, ns string, cli client.Client) error {
+	registryDeployment := appsv1.Deployment{}
+	err := cli.Get(ctx, client.ObjectKey{Namespace: ns, Name: "registry"}, &registryDeployment)
+	if err != nil {
+		return fmt.Errorf("get registry deployment: %w", err)
+	}
+
+	zeroVar := int32(0)
+
+	registryDeployment.Spec.Replicas = &zeroVar
+	err = cli.Update(ctx, &registryDeployment)
+	if err != nil {
+		return fmt.Errorf("update registry deployment: %w", err)
+	}
 
 	return nil
 }

@@ -603,6 +603,11 @@ func (r *InstallationReconciler) ReconcileK0sVersion(ctx context.Context, in *v1
 func (r *InstallationReconciler) ReconcileRegistry(ctx context.Context, in *v1beta1.Installation) error {
 	log := ctrl.LoggerFrom(ctx)
 
+	if in == nil || !in.Spec.HighAvailability {
+		// do not create registry secrets or rebalance stateful pods if the installation is not HA
+		return nil
+	}
+
 	metadata, err := release.MetadataFor(ctx, in, r.Client)
 	if err != nil {
 		in.Status.SetState(v1beta1.InstallationStateHelmChartUpdateFailure, err.Error(), nil)

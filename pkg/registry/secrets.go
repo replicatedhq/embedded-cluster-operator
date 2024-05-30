@@ -16,12 +16,20 @@ import (
 )
 
 const (
+	// SeaweedfsNamespace is the namespace where the Seaweedfs secret is stored.
+	// This namespace is defined in the chart in the release metadata.
 	SeaweedfsNamespace = "seaweedfs"
 
+	// SeaweedfsS3SecretName is the name of the Seaweedfs secret.
+	// This secret name is defined in the chart in the release metadata.
 	SeaweedfsS3SecretName = "secret-seaweedfs-s3"
 
+	// RegistryNamespace is the namespace where the Registry secret is stored.
+	// This namespace is defined in the chart in the release metadata.
 	RegistryNamespace = "registry"
 
+	// RegistryS3SecretName is the name of the Registry secret.
+	// This secret name is defined in the chart in the release metadata.
 	RegistryS3SecretName = "seaweedfs-s3-rw"
 
 	// SeaweedfsS3SecretReadyConditionType represents the condition type that indicates status of

@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	clusterv1beta1 "github.com/replicatedhq/embedded-cluster-kinds/apis/v1beta1"
-	"github.com/replicatedhq/embedded-cluster-operator/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,11 +45,6 @@ func EnsureSecrets(ctx context.Context, in *clusterv1beta1.Installation, cli cli
 
 	sfsConfig, op, err := ensureSeaweedfsS3Secret(ctx, in, cli)
 	if err != nil {
-		if errors.IsFatalError(err) {
-			in.Status.SetCondition(getSeaweedfsS3SecretReadyCondition(in, metav1.ConditionFalse, "ReleaseMetadataFailed", err.Error()))
-			log.Error(err, "Fatal error, will not retry")
-			return nil
-		}
 		in.Status.SetCondition(getSeaweedfsS3SecretReadyCondition(in, metav1.ConditionFalse, "SecretFailed", err.Error()))
 		return fmt.Errorf("ensure seaweedfs s3 secret: %w", err)
 	} else if op != controllerutil.OperationResultNone {
@@ -60,11 +54,6 @@ func EnsureSecrets(ctx context.Context, in *clusterv1beta1.Installation, cli cli
 
 	op, err = ensureRegistryS3Secret(ctx, in, cli, sfsConfig)
 	if err != nil {
-		if errors.IsFatalError(err) {
-			in.Status.SetCondition(getRegistryS3SecretReadyCondition(in, metav1.ConditionFalse, "ReleaseMetadataFailed", err.Error()))
-			log.Error(err, "Fatal error, will not retry")
-			return nil
-		}
 		in.Status.SetCondition(getRegistryS3SecretReadyCondition(in, metav1.ConditionFalse, "SecretFailed", err.Error()))
 		return fmt.Errorf("ensure registry s3 secret: %w", err)
 	} else if op != controllerutil.OperationResultNone {

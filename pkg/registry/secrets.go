@@ -27,7 +27,7 @@ const (
 )
 
 func EnsureSecrets(ctx context.Context, in *clusterv1beta1.Installation, metadata *ectypes.ReleaseMetadata, cli client.Client) error {
-	if !in.Spec.HighAvailability {
+	if in == nil || !in.Spec.AirGap || !in.Spec.HighAvailability {
 		return nil
 	}
 

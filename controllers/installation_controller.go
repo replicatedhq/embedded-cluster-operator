@@ -1099,6 +1099,7 @@ func (r *InstallationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1beta1.Installation{}).
 		Owns(&corev1.Secret{}).
+		Owns(&corev1.Service{}).
 		Watches(&corev1.Node{}, &handler.EnqueueRequestForObject{}).
 		Watches(&apv1b2.Plan{}, &handler.EnqueueRequestForObject{}).
 		Watches(&k0shelm.Chart{}, &handler.EnqueueRequestForObject{}).

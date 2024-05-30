@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	k0sv1beta1 "github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
 	clusterv1beta1 "github.com/replicatedhq/embedded-cluster-kinds/apis/v1beta1"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -17,6 +16,14 @@ import (
 )
 
 const (
+	SeaweedfsNamespace = "seaweedfs"
+
+	SeaweedfsS3SecretName = "secret-seaweedfs-s3"
+
+	RegistryNamespace = "registry"
+
+	RegistryS3SecretName = "seaweedfs-s3-rw"
+
 	// SeaweedfsS3SecretReadyConditionType represents the condition type that indicates status of
 	// the Seaweedfs secret.
 	SeaweedfsS3SecretReadyConditionType = "SeaweedfsS3SecretReady"
@@ -26,10 +33,10 @@ const (
 	RegistryS3SecretReadyConditionType = "RegistryS3SecretReady"
 )
 
-func EnsureSecrets(ctx context.Context, in *clusterv1beta1.Installation, cli client.Client, seaweedfsExt, registryExt k0sv1beta1.HelmExtensions) error {
+func EnsureSecrets(ctx context.Context, in *clusterv1beta1.Installation, cli client.Client) error {
 	log := ctrl.LoggerFrom(ctx)
 
-	sfsConfig, op, err := ensureSeaweedfsS3Secret(ctx, in, cli, seaweedfsExt)
+	sfsConfig, op, err := ensureSeaweedfsS3Secret(ctx, in, cli)
 	if err != nil {
 		if errors.IsFatalError(err) {
 			in.Status.SetCondition(getSeaweedfsS3SecretReadyCondition(in, metav1.ConditionFalse, "ReleaseMetadataFailed", err.Error()))
@@ -43,7 +50,7 @@ func EnsureSecrets(ctx context.Context, in *clusterv1beta1.Installation, cli cli
 	}
 	in.Status.SetCondition(getSeaweedfsS3SecretReadyCondition(in, metav1.ConditionTrue, "SecretReady", ""))
 
-	op, err = ensureRegistryS3Secret(ctx, in, cli, registryExt, sfsConfig)
+	op, err = ensureRegistryS3Secret(ctx, in, cli, sfsConfig)
 	if err != nil {
 		if errors.IsFatalError(err) {
 			in.Status.SetCondition(getRegistryS3SecretReadyCondition(in, metav1.ConditionFalse, "ReleaseMetadataFailed", err.Error()))
@@ -60,34 +67,18 @@ func EnsureSecrets(ctx context.Context, in *clusterv1beta1.Installation, cli cli
 	return nil
 }
 
-func ensureSeaweedfsS3Secret(ctx context.Context, in *clusterv1beta1.Installation, cli client.Client, ext k0sv1beta1.HelmExtensions) (*seaweedfsConfig, controllerutil.OperationResult, error) {
+func ensureSeaweedfsS3Secret(ctx context.Context, in *clusterv1beta1.Installation, cli client.Client) (*seaweedfsConfig, controllerutil.OperationResult, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	op := controllerutil.OperationResultNone
 
-	if len(ext.Charts) == 0 {
-		// This should not happen
-		err := errors.NewFatalError(fmt.Errorf("seaweedfs chart not found"))
-		return nil, op, err
-	}
-	chart := ext.Charts[0]
-
-	namespace := chart.TargetNS
-
-	secretName, err := getSeaweedfsS3SecretNameFromHelmExtension(ext)
-	if err != nil {
-		// This should not happen
-		err = errors.NewFatalError(fmt.Errorf("get seaweedfs s3 secret name from helm extension: %w", err))
-		return nil, op, err
-	}
-
-	err = ensureSeaweedfsNamespace(ctx, cli, namespace)
+	err := ensureSeaweedfsNamespace(ctx, cli, SeaweedfsNamespace)
 	if err != nil {
 		return nil, op, fmt.Errorf("ensure seaweedfs namespace: %w", err)
 	}
 
 	obj := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: secretName, Namespace: namespace},
+		ObjectMeta: metav1.ObjectMeta{Name: SeaweedfsS3SecretName, Namespace: SeaweedfsNamespace},
 	}
 
 	var config seaweedfsConfig
@@ -151,7 +142,7 @@ func ensureSeaweedfsS3Secret(ctx context.Context, in *clusterv1beta1.Installatio
 	return &config, op, nil
 }
 
-func ensureRegistryS3Secret(ctx context.Context, in *clusterv1beta1.Installation, cli client.Client, ext k0sv1beta1.HelmExtensions, sfsConfig *seaweedfsConfig) (controllerutil.OperationResult, error) {
+func ensureRegistryS3Secret(ctx context.Context, in *clusterv1beta1.Installation, cli client.Client, sfsConfig *seaweedfsConfig) (controllerutil.OperationResult, error) {
 	op := controllerutil.OperationResultNone
 
 	sfsCreds, ok := sfsConfig.getCredentials("anvAdmin")
@@ -159,29 +150,13 @@ func ensureRegistryS3Secret(ctx context.Context, in *clusterv1beta1.Installation
 		return op, fmt.Errorf("seaweedfs s3 anvAdmin credentials not found")
 	}
 
-	if len(ext.Charts) == 0 {
-		// This should not happen
-		err := errors.NewFatalError(fmt.Errorf("seaweedfs chart not found"))
-		return op, err
-	}
-	chart := ext.Charts[0]
-
-	namespace := chart.TargetNS
-
-	secretName, err := getRegistryS3SecretNameFromHelmExtension(ext)
-	if err != nil {
-		// This should not happen
-		err = errors.NewFatalError(fmt.Errorf("get registry s3 secret name from helm extension: %w", err))
-		return op, err
-	}
-
-	err = ensureRegistryNamespace(ctx, cli, namespace)
+	err := ensureRegistryNamespace(ctx, cli, RegistryNamespace)
 	if err != nil {
 		return op, fmt.Errorf("ensure registry namespace: %w", err)
 	}
 
 	obj := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: secretName, Namespace: namespace},
+		ObjectMeta: metav1.ObjectMeta{Name: RegistryS3SecretName, Namespace: RegistryNamespace},
 	}
 
 	op, err = ctrl.CreateOrUpdate(ctx, cli, obj, func() error {

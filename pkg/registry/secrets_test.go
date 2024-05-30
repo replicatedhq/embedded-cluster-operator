@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	k0sv1beta1 "github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
 	clusterv1beta1 "github.com/replicatedhq/embedded-cluster-kinds/apis/v1beta1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,29 +18,15 @@ import (
 )
 
 func Test_ensureSeaweedfsS3Secret(t *testing.T) {
-	type args struct {
-		ext k0sv1beta1.HelmExtensions
-	}
 	tests := []struct {
 		name            string
-		args            args
 		initRuntimeObjs []runtime.Object
 		wantOp          controllerutil.OperationResult
 		assertRuntime   func(t *testing.T, cli client.Client)
 		wantErr         bool
 	}{
 		{
-			name: "create secret",
-			args: args{
-				ext: k0sv1beta1.HelmExtensions{
-					Charts: []k0sv1beta1.Chart{
-						{
-							TargetNS: "seaweedfs",
-							Values:   `{"filer":{"s3":{"existingConfigSecret":"secret-seaweedfs-s3"}}}`,
-						},
-					},
-				},
-			},
+			name:   "create secret",
 			wantOp: controllerutil.OperationResultCreated,
 			assertRuntime: func(t *testing.T, cli client.Client) {
 				namespace := &corev1.Namespace{}
@@ -61,16 +46,6 @@ func Test_ensureSeaweedfsS3Secret(t *testing.T) {
 		},
 		{
 			name: "update secret",
-			args: args{
-				ext: k0sv1beta1.HelmExtensions{
-					Charts: []k0sv1beta1.Chart{
-						{
-							TargetNS: "seaweedfs",
-							Values:   `{"filer":{"s3":{"existingConfigSecret":"secret-seaweedfs-s3"}}}`,
-						},
-					},
-				},
-			},
 			initRuntimeObjs: []runtime.Object{
 				&corev1.Namespace{
 					ObjectMeta: metav1.ObjectMeta{
@@ -103,16 +78,6 @@ func Test_ensureSeaweedfsS3Secret(t *testing.T) {
 		},
 		{
 			name: "no change",
-			args: args{
-				ext: k0sv1beta1.HelmExtensions{
-					Charts: []k0sv1beta1.Chart{
-						{
-							TargetNS: "seaweedfs",
-							Values:   `{"filer":{"s3":{"existingConfigSecret":"secret-seaweedfs-s3"}}}`,
-						},
-					},
-				},
-			},
 			initRuntimeObjs: []runtime.Object{
 				&corev1.Namespace{
 					ObjectMeta: metav1.ObjectMeta{
@@ -164,7 +129,7 @@ func Test_ensureSeaweedfsS3Secret(t *testing.T) {
 				WithRuntimeObjects(tt.initRuntimeObjs...).
 				Build()
 
-			_, gotOp, err := ensureSeaweedfsS3Secret(context.Background(), installation(), cli, tt.args.ext)
+			_, gotOp, err := ensureSeaweedfsS3Secret(context.Background(), installation(), cli)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -179,7 +144,6 @@ func Test_ensureSeaweedfsS3Secret(t *testing.T) {
 
 func Test_ensureRegistryS3Secret(t *testing.T) {
 	type args struct {
-		ext       k0sv1beta1.HelmExtensions
 		sfsConfig *seaweedfsConfig
 	}
 	tests := []struct {
@@ -193,14 +157,6 @@ func Test_ensureRegistryS3Secret(t *testing.T) {
 		{
 			name: "create secret",
 			args: args{
-				ext: k0sv1beta1.HelmExtensions{
-					Charts: []k0sv1beta1.Chart{
-						{
-							TargetNS: "registry",
-							Values:   `{"secrets":{"s3":{"secretRef":"seaweedfs-s3-rw"}}}`,
-						},
-					},
-				},
 				sfsConfig: &seaweedfsConfig{
 					Identities: []seaweedfsIdentity{
 						{
@@ -240,14 +196,6 @@ func Test_ensureRegistryS3Secret(t *testing.T) {
 		{
 			name: "update secret",
 			args: args{
-				ext: k0sv1beta1.HelmExtensions{
-					Charts: []k0sv1beta1.Chart{
-						{
-							TargetNS: "registry",
-							Values:   `{"secrets":{"s3":{"secretRef":"seaweedfs-s3-rw"}}}`,
-						},
-					},
-				},
 				sfsConfig: &seaweedfsConfig{
 					Identities: []seaweedfsIdentity{
 						{
@@ -300,14 +248,6 @@ func Test_ensureRegistryS3Secret(t *testing.T) {
 		{
 			name: "no change",
 			args: args{
-				ext: k0sv1beta1.HelmExtensions{
-					Charts: []k0sv1beta1.Chart{
-						{
-							TargetNS: "registry",
-							Values:   `{"secrets":{"s3":{"secretRef":"seaweedfs-s3-rw"}}}`,
-						},
-					},
-				},
 				sfsConfig: &seaweedfsConfig{
 					Identities: []seaweedfsIdentity{
 						{
@@ -370,7 +310,7 @@ func Test_ensureRegistryS3Secret(t *testing.T) {
 				WithRuntimeObjects(tt.initRuntimeObjs...).
 				Build()
 
-			gotOp, err := ensureRegistryS3Secret(context.Background(), installation(), cli, tt.args.ext, tt.args.sfsConfig)
+			gotOp, err := ensureRegistryS3Secret(context.Background(), installation(), cli, tt.args.sfsConfig)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -385,9 +325,7 @@ func Test_ensureRegistryS3Secret(t *testing.T) {
 
 func TestEnsureSecrets(t *testing.T) {
 	type args struct {
-		in           *clusterv1beta1.Installation
-		seaweedfsExt k0sv1beta1.HelmExtensions
-		registryExt  k0sv1beta1.HelmExtensions
+		in *clusterv1beta1.Installation
 	}
 	tests := []struct {
 		name            string
@@ -415,22 +353,6 @@ func TestEnsureSecrets(t *testing.T) {
 						},
 					}
 				}),
-				seaweedfsExt: k0sv1beta1.HelmExtensions{
-					Charts: []k0sv1beta1.Chart{
-						{
-							TargetNS: "seaweedfs",
-							Values:   `{"filer":{"s3":{"existingConfigSecret":"secret-seaweedfs-s3"}}}`,
-						},
-					},
-				},
-				registryExt: k0sv1beta1.HelmExtensions{
-					Charts: []k0sv1beta1.Chart{
-						{
-							TargetNS: "registry",
-							Values:   `{"secrets":{"s3":{"secretRef":"seaweedfs-s3-rw"}}}`,
-						},
-					},
-				},
 			},
 			initRuntimeObjs: []runtime.Object{
 				&corev1.Namespace{
@@ -519,7 +441,7 @@ func TestEnsureSecrets(t *testing.T) {
 				WithRuntimeObjects(tt.initRuntimeObjs...).
 				Build()
 
-			err := EnsureSecrets(context.Background(), tt.args.in, cli, tt.args.seaweedfsExt, tt.args.registryExt)
+			err := EnsureSecrets(context.Background(), tt.args.in, cli)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {

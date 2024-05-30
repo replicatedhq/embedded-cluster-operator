@@ -607,31 +607,7 @@ func (r *InstallationReconciler) ReconcileRegistry(ctx context.Context, in *v1be
 
 	log := ctrl.LoggerFrom(ctx)
 
-	metadata, err := release.MetadataFor(ctx, in, r.Client)
-	if err != nil {
-		// This should not happen
-		err = fmt.Errorf("failed to get release metadata: %w", err)
-		log.Error(err, "Skipping registry reconciliation")
-		return nil
-	}
-
-	seaweedfsExt, ok := metadata.BuiltinConfigs["seaweedfs"]
-	if !ok {
-		// This should not happen
-		err := fmt.Errorf("seaweedfs helm extension not found")
-		log.Error(err, "Skipping registry reconciliation")
-		return nil
-	}
-
-	registryHAExt, ok := metadata.BuiltinConfigs["registry-ha"]
-	if ok {
-		// This should not happen
-		err := fmt.Errorf("registry-ha helm extension not found")
-		log.Error(err, "Skipping registry reconciliation")
-		return nil
-	}
-
-	err = registry.EnsureSecrets(ctx, in, r.Client, seaweedfsExt, registryHAExt)
+	err := registry.EnsureSecrets(ctx, in, r.Client)
 	if err != nil {
 		// Conditions may be updated so we need to update the status
 		if err := r.Status().Update(ctx, in); err != nil {

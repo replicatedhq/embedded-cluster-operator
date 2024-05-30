@@ -603,8 +603,8 @@ func (r *InstallationReconciler) ReconcileK0sVersion(ctx context.Context, in *v1
 func (r *InstallationReconciler) ReconcileRegistry(ctx context.Context, in *v1beta1.Installation) error {
 	log := ctrl.LoggerFrom(ctx)
 
-	if in == nil || !in.Spec.HighAvailability {
-		// do not create registry secrets or rebalance stateful pods if the installation is not HA
+	if in == nil || !in.Spec.HighAvailability || !in.Spec.AirGap {
+		// do not create registry secrets or rebalance stateful pods if the installation is not HA or not airgapped
 		return nil
 	}
 
@@ -620,6 +620,15 @@ func (r *InstallationReconciler) ReconcileRegistry(ctx context.Context, in *v1be
 			log.Error(err, "Failed to update installation status")
 		}
 		return fmt.Errorf("failed to ensure registry secrets: %w", err)
+	}
+
+	err = registry.MigrateRegistryData(ctx, in, metadata, r.Client)
+	if err != nil {
+		if err := r.Status().Update(ctx, in); err != nil {
+			log.Error(err, "Failed to update installation status")
+		}
+		return fmt.Errorf("failed to migrate registry data: %w", err)
+
 	}
 
 	return nil

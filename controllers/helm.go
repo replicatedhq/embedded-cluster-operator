@@ -9,11 +9,14 @@ import (
 	k0shelm "github.com/k0sproject/k0s/pkg/apis/helm/v1beta1"
 	k0sv1beta1 "github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
 	"github.com/ohler55/ojg/jp"
-	ectypes "github.com/replicatedhq/embedded-cluster-kinds/types"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/yaml"
 
 	"github.com/replicatedhq/embedded-cluster-kinds/apis/v1beta1"
+	ectypes "github.com/replicatedhq/embedded-cluster-kinds/types"
+	"github.com/replicatedhq/embedded-cluster-operator/pkg/registry"
+	"github.com/replicatedhq/embedded-cluster-operator/pkg/util"
 )
 
 const DEFAULT_VENDOR_CHART_ORDER = 10
@@ -75,11 +78,13 @@ func mergeHelmConfigs(ctx context.Context, meta *ectypes.ReleaseMetadata, in *v1
 				combinedConfigs.Repositories = append(combinedConfigs.Repositories, seaweedfsConfig.Repositories...)
 			}
 
-			// TODO: only add registry-ha if the registry-to-seaweed migration has completed
-			registryConfig, ok := meta.BuiltinConfigs["registry-ha"]
-			if ok {
-				combinedConfigs.Charts = append(combinedConfigs.Charts, registryConfig.Charts...)
-				combinedConfigs.Repositories = append(combinedConfigs.Repositories, registryConfig.Repositories...)
+			migrationStatus := util.CheckConditionStatus(in.Status, registry.RegistryMigrationStatusConditionType)
+			if migrationStatus == metav1.ConditionTrue {
+				registryConfig, ok := meta.BuiltinConfigs["registry-ha"]
+				if ok {
+					combinedConfigs.Charts = append(combinedConfigs.Charts, registryConfig.Charts...)
+					combinedConfigs.Repositories = append(combinedConfigs.Repositories, registryConfig.Repositories...)
+				}
 			}
 		} else {
 			registryConfig, ok := meta.BuiltinConfigs["registry"]

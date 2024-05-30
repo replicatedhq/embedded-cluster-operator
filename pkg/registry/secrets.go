@@ -27,6 +27,10 @@ const (
 )
 
 func EnsureSecrets(ctx context.Context, in *clusterv1beta1.Installation, metadata *ectypes.ReleaseMetadata, cli client.Client) error {
+	if !in.Spec.HighAvailability {
+		return nil
+	}
+
 	log := ctrl.LoggerFrom(ctx)
 
 	config, op, err := ensureSeaweedfsS3Secret(ctx, in, metadata, cli)

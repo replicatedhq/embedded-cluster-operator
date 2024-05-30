@@ -5,16 +5,15 @@ import (
 	"encoding/json"
 	"fmt"
 
-	k0sv1beta1 "github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
 	clusterv1beta1 "github.com/replicatedhq/embedded-cluster-kinds/apis/v1beta1"
 	ectypes "github.com/replicatedhq/embedded-cluster-kinds/types"
+	"github.com/replicatedhq/embedded-cluster-operator/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -39,6 +38,10 @@ func EnsureSecrets(ctx context.Context, in *clusterv1beta1.Installation, metadat
 			Message:            err.Error(),
 			ObservedGeneration: in.Generation,
 		})
+		if errors.IsFatalError(err) {
+			log.Error(err, "Fatal error, will not retry")
+			return nil
+		}
 		return fmt.Errorf("ensure seaweedfs s3 secret: %w", err)
 	} else if op != controllerutil.OperationResultNone {
 		log.Info("Seaweedfs s3 secret changed", "operation", op)
@@ -59,6 +62,10 @@ func EnsureSecrets(ctx context.Context, in *clusterv1beta1.Installation, metadat
 			Message:            err.Error(),
 			ObservedGeneration: in.Generation,
 		})
+		if errors.IsFatalError(err) {
+			log.Error(err, "Fatal error, will not retry")
+			return nil
+		}
 		return fmt.Errorf("ensure registry s3 secret: %w", err)
 	} else if op != controllerutil.OperationResultNone {
 		log.Info("Registry s3 secret changed", "operation", op)
@@ -80,12 +87,14 @@ func ensureSeaweedfsS3Secret(ctx context.Context, in *clusterv1beta1.Installatio
 
 	namespace, err := getSeaweedfsNamespaceFromMetadata(metadata)
 	if err != nil {
-		return nil, op, fmt.Errorf("get seaweedfs namespace from metadata: %w", err)
+		err = errors.NewFatalError(fmt.Errorf("get seaweedfs namespace from metadata: %w", err))
+		return nil, op, err
 	}
 
 	secretName, err := getSeaweedfsS3SecretNameFromMetadata(metadata)
 	if err != nil {
-		return nil, op, fmt.Errorf("get seaweedfs s3 secret name from metadata: %w", err)
+		err = errors.NewFatalError(fmt.Errorf("get seaweedfs s3 secret name from metadata: %w", err))
+		return nil, op, err
 	}
 
 	err = ensureSeaweedfsNamespace(ctx, cli, namespace)
@@ -164,7 +173,7 @@ func ensureSeaweedfsNamespace(ctx context.Context, cli client.Client, namespace 
 	}
 
 	err := cli.Create(ctx, obj)
-	if err != nil && !errors.IsAlreadyExists(err) {
+	if err != nil && !k8serrors.IsAlreadyExists(err) {
 		return fmt.Errorf("create seaweedfs namespace: %w", err)
 
 	}
@@ -182,11 +191,13 @@ func ensureRegistryS3Secret(ctx context.Context, in *clusterv1beta1.Installation
 
 	namespace, err := getRegistryNamespaceFromMetadata(metadata)
 	if err != nil {
+		// TODO: this is a fatal error, should we return it?
 		return op, fmt.Errorf("get registry namespace from metadata: %w", err)
 	}
 
 	secretName, err := getRegistryS3SecretNameFromMetadata(metadata)
 	if err != nil {
+		// TODO: this is a fatal error, should we return it?
 		return op, fmt.Errorf("get registry s3 secret name from metadata: %w", err)
 	}
 
@@ -226,91 +237,9 @@ func ensureRegistryNamespace(ctx context.Context, cli client.Client, namespace s
 	}
 
 	err := cli.Create(ctx, obj)
-	if err != nil && !errors.IsAlreadyExists(err) {
+	if err != nil && !k8serrors.IsAlreadyExists(err) {
 		return fmt.Errorf("create registry namespace: %w", err)
 	}
 
 	return nil
-}
-
-func getSeaweedfsNamespaceFromMetadata(metadata *ectypes.ReleaseMetadata) (string, error) {
-	chart, err := getSeaweedfsChartFromMetadata(metadata)
-	if err != nil {
-		return "", fmt.Errorf("get seaweedfs charts settings from metadata: %w", err)
-	}
-	return chart.TargetNS, nil
-}
-
-func getSeaweedfsS3SecretNameFromMetadata(metadata *ectypes.ReleaseMetadata) (string, error) {
-	chart, err := getSeaweedfsChartFromMetadata(metadata)
-	if err != nil {
-		return "", fmt.Errorf("get seaweedfs chart from metadata: %w", err)
-	}
-	var valuesStruct struct {
-		Filer struct {
-			S3 struct {
-				ExistingConfigSecret string `json:"existingConfigSecret"`
-			} `json:"s3"`
-		} `json:"filer"`
-	}
-	err = yaml.Unmarshal([]byte(chart.Values), &valuesStruct)
-	if err != nil {
-		return "", fmt.Errorf("unmarshal chart values: %w", err)
-	}
-	if valuesStruct.Filer.S3.ExistingConfigSecret == "" {
-		return "", fmt.Errorf("secret ref not found")
-	}
-	return valuesStruct.Filer.S3.ExistingConfigSecret, nil
-}
-
-func getSeaweedfsChartFromMetadata(metadata *ectypes.ReleaseMetadata) (*k0sv1beta1.Chart, error) {
-	config, ok := metadata.BuiltinConfigs["seaweedfs"]
-	if !ok {
-		return nil, fmt.Errorf("config not found")
-	}
-	if len(config.Charts) == 0 {
-		return nil, fmt.Errorf("chart not found")
-	}
-	return &config.Charts[0], nil
-}
-
-func getRegistryNamespaceFromMetadata(metadata *ectypes.ReleaseMetadata) (string, error) {
-	chart, err := getRegistryChartFromMetadata(metadata)
-	if err != nil {
-		return "", fmt.Errorf("get registry chart from metadata: %w", err)
-	}
-	return chart.TargetNS, nil
-}
-
-func getRegistryS3SecretNameFromMetadata(metadata *ectypes.ReleaseMetadata) (string, error) {
-	chart, err := getRegistryChartFromMetadata(metadata)
-	if err != nil {
-		return "", fmt.Errorf("get registry chart from metadata: %w", err)
-	}
-	var valuesStruct struct {
-		Secrets struct {
-			S3 struct {
-				SecretRef string `json:"secretRef"`
-			} `json:"s3"`
-		} `json:"secrets"`
-	}
-	err = yaml.Unmarshal([]byte(chart.Values), &valuesStruct)
-	if err != nil {
-		return "", fmt.Errorf("unmarshal chart values: %w", err)
-	}
-	if valuesStruct.Secrets.S3.SecretRef == "" {
-		return "", fmt.Errorf("secret ref not found")
-	}
-	return valuesStruct.Secrets.S3.SecretRef, nil
-}
-
-func getRegistryChartFromMetadata(metadata *ectypes.ReleaseMetadata) (*k0sv1beta1.Chart, error) {
-	config, ok := metadata.BuiltinConfigs["registry-ha"]
-	if !ok {
-		return nil, fmt.Errorf("config not found")
-	}
-	if len(config.Charts) == 0 {
-		return nil, fmt.Errorf("chart not found")
-	}
-	return &config.Charts[0], nil
 }

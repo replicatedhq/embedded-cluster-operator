@@ -598,23 +598,22 @@ func (r *InstallationReconciler) ReconcileK0sVersion(ctx context.Context, in *v1
 	return nil
 }
 
-// PreReconcileHelmCharts reconciles helm chart dependencies including secrets.
-func (r *InstallationReconciler) PreReconcileHelmCharts(ctx context.Context, in *v1beta1.Installation) error {
+// ReconcileRegistry reconciles registry components, ensuring that the necessary secrets are
+// created as well as rebalancing stateful pods when nodes are removed from the cluster.
+func (r *InstallationReconciler) ReconcileRegistry(ctx context.Context, in *v1beta1.Installation) error {
 	log := ctrl.LoggerFrom(ctx)
 
-	meta, err := release.MetadataFor(ctx, in, r.Client)
+	metadata, err := release.MetadataFor(ctx, in, r.Client)
 	if err != nil {
 		in.Status.SetState(v1beta1.InstallationStateHelmChartUpdateFailure, err.Error(), nil)
 		return nil
 	}
 
-	err = registry.EnsureSecrets(ctx, in, meta, r.Client)
+	err = registry.EnsureSecrets(ctx, in, metadata, r.Client)
 	if err != nil {
 		if err := r.Status().Update(ctx, in); err != nil {
 			log.Error(err, "Failed to update installation status")
 		}
-		// TODO: im a little unclear when to return an error vs just update the status and reconcile again.
-		// If we don't return an error, when will the reconcile loop run again?
 		return fmt.Errorf("failed to ensure registry secrets: %w", err)
 	}
 
@@ -1051,7 +1050,7 @@ func (r *InstallationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	// reconcile helm chart dependencies including secrets.
-	if err := r.PreReconcileHelmCharts(ctx, in); err != nil {
+	if err := r.ReconcileRegistry(ctx, in); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to pre-reconcile helm charts: %w", err)
 	}
 

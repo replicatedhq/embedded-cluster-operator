@@ -68,11 +68,6 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, m
 		return nil
 	}
 
-	err = scaleDownRegistry(ctx, ns, cli)
-	if err != nil {
-		return fmt.Errorf("scale down registry deployment: %w", err)
-	}
-
 	registryS3CredsSecret, err := getRegistryS3SecretNameFromMetadata(metadata)
 	if err != nil {
 		return fmt.Errorf("get registry s3 secret name from metadata: %w", err)
@@ -102,6 +97,19 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, m
 						},
 					},
 					InitContainers: []corev1.Container{
+						{
+							Name:  "scale-down-registry",
+							Image: "bitnami/kubectl:1.29.5", // TODO make this dynamic, ensure it's included in the airgap bundle
+							Command: []string{
+								"kubectl",
+								"scale",
+								"deployment",
+								"registry",
+								"-n",
+								ns,
+								"--replicas=0",
+							},
+						},
 						{
 							Name:    "wait-for-seaweed",
 							Image:   "amazon/aws-cli:latest", // TODO improve this

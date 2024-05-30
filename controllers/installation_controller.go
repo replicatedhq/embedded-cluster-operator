@@ -601,28 +601,23 @@ func (r *InstallationReconciler) ReconcileK0sVersion(ctx context.Context, in *v1
 // ReconcileRegistry reconciles registry components, ensuring that the necessary secrets are
 // created as well as rebalancing stateful pods when nodes are removed from the cluster.
 func (r *InstallationReconciler) ReconcileRegistry(ctx context.Context, in *v1beta1.Installation) error {
-	log := ctrl.LoggerFrom(ctx)
-
-	if in == nil || !in.Spec.HighAvailability || !in.Spec.AirGap {
+	if in == nil || !in.Spec.AirGap || !in.Spec.HighAvailability {
 		// do not create registry secrets or rebalance stateful pods if the installation is not HA or not airgapped
 		return nil
 	}
 
-	metadata, err := release.MetadataFor(ctx, in, r.Client)
-	if err != nil {
-		in.Status.SetState(v1beta1.InstallationStateHelmChartUpdateFailure, err.Error(), nil)
-		return nil
-	}
+	log := ctrl.LoggerFrom(ctx)
 
-	err = registry.EnsureSecrets(ctx, in, metadata, r.Client)
+	err := registry.EnsureSecrets(ctx, in, r.Client)
 	if err != nil {
+		// Conditions may be updated so we need to update the status
 		if err := r.Status().Update(ctx, in); err != nil {
 			log.Error(err, "Failed to update installation status")
 		}
 		return fmt.Errorf("failed to ensure registry secrets: %w", err)
 	}
 
-	err = registry.MigrateRegistryData(ctx, in, metadata, r.Client)
+	err = registry.MigrateRegistryData(ctx, in, r.Client)
 	if err != nil {
 		if err := r.Status().Update(ctx, in); err != nil {
 			log.Error(err, "Failed to update installation status")

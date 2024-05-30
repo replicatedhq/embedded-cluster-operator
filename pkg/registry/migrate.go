@@ -171,6 +171,12 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, m
 		},
 	}
 	if err := cli.Create(ctx, &migrationJob); err != nil {
+		in.Status.SetCondition(metav1.Condition{
+			Type:               RegistryMigrationStatusConditionType,
+			Status:             metav1.ConditionFalse,
+			Reason:             "MigrationJobFailedCreation",
+			ObservedGeneration: in.Generation,
+		})
 		return fmt.Errorf("create migration job: %w", err)
 	}
 

@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	k0sv1beta1 "github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
 	clusterv1beta1 "github.com/replicatedhq/embedded-cluster-kinds/apis/v1beta1"
-	ectypes "github.com/replicatedhq/embedded-cluster-kinds/types"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -26,78 +26,58 @@ const (
 	RegistryS3SecretReadyConditionType = "RegistryS3SecretReady"
 )
 
-func EnsureSecrets(ctx context.Context, in *clusterv1beta1.Installation, metadata *ectypes.ReleaseMetadata, cli client.Client) error {
-	if in == nil || !in.Spec.AirGap || !in.Spec.HighAvailability {
-		return nil
-	}
-
+func EnsureSecrets(ctx context.Context, in *clusterv1beta1.Installation, cli client.Client, seaweedfsExt, registryExt k0sv1beta1.HelmExtensions) error {
 	log := ctrl.LoggerFrom(ctx)
 
-	config, op, err := ensureSeaweedfsS3Secret(ctx, in, metadata, cli)
+	sfsConfig, op, err := ensureSeaweedfsS3Secret(ctx, in, cli, seaweedfsExt)
 	if err != nil {
-		in.Status.SetCondition(metav1.Condition{
-			Type:               SeaweedfsS3SecretReadyConditionType,
-			Status:             metav1.ConditionFalse,
-			Reason:             "SecretFailed",
-			Message:            err.Error(),
-			ObservedGeneration: in.Generation,
-		})
 		if errors.IsFatalError(err) {
+			in.Status.SetCondition(getSeaweedfsS3SecretReadyCondition(in, metav1.ConditionFalse, "ReleaseMetadataFailed", err.Error()))
 			log.Error(err, "Fatal error, will not retry")
 			return nil
 		}
+		in.Status.SetCondition(getSeaweedfsS3SecretReadyCondition(in, metav1.ConditionFalse, "SecretFailed", err.Error()))
 		return fmt.Errorf("ensure seaweedfs s3 secret: %w", err)
 	} else if op != controllerutil.OperationResultNone {
 		log.Info("Seaweedfs s3 secret changed", "operation", op)
 	}
-	in.Status.SetCondition(metav1.Condition{
-		Type:               SeaweedfsS3SecretReadyConditionType,
-		Status:             metav1.ConditionTrue,
-		Reason:             "SecretReady",
-		ObservedGeneration: in.Generation,
-	})
+	in.Status.SetCondition(getSeaweedfsS3SecretReadyCondition(in, metav1.ConditionTrue, "SecretReady", ""))
 
-	op, err = ensureRegistryS3Secret(ctx, in, metadata, cli, config)
+	op, err = ensureRegistryS3Secret(ctx, in, cli, registryExt, sfsConfig)
 	if err != nil {
-		in.Status.SetCondition(metav1.Condition{
-			Type:               RegistryS3SecretReadyConditionType,
-			Status:             metav1.ConditionFalse,
-			Reason:             "SecretFailed",
-			Message:            err.Error(),
-			ObservedGeneration: in.Generation,
-		})
 		if errors.IsFatalError(err) {
+			in.Status.SetCondition(getRegistryS3SecretReadyCondition(in, metav1.ConditionFalse, "ReleaseMetadataFailed", err.Error()))
 			log.Error(err, "Fatal error, will not retry")
 			return nil
 		}
+		in.Status.SetCondition(getRegistryS3SecretReadyCondition(in, metav1.ConditionFalse, "SecretFailed", err.Error()))
 		return fmt.Errorf("ensure registry s3 secret: %w", err)
 	} else if op != controllerutil.OperationResultNone {
 		log.Info("Registry s3 secret changed", "operation", op)
 	}
-	in.Status.SetCondition(metav1.Condition{
-		Type:               RegistryS3SecretReadyConditionType,
-		Status:             metav1.ConditionTrue,
-		Reason:             "SecretReady",
-		ObservedGeneration: in.Generation,
-	})
+	in.Status.SetCondition(getRegistryS3SecretReadyCondition(in, metav1.ConditionTrue, "SecretReady", ""))
 
 	return nil
 }
 
-func ensureSeaweedfsS3Secret(ctx context.Context, in *clusterv1beta1.Installation, metadata *ectypes.ReleaseMetadata, cli client.Client) (*seaweedfsConfig, controllerutil.OperationResult, error) {
+func ensureSeaweedfsS3Secret(ctx context.Context, in *clusterv1beta1.Installation, cli client.Client, ext k0sv1beta1.HelmExtensions) (*seaweedfsConfig, controllerutil.OperationResult, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	op := controllerutil.OperationResultNone
 
-	namespace, err := getSeaweedfsNamespaceFromMetadata(metadata)
-	if err != nil {
-		err = errors.NewFatalError(fmt.Errorf("get seaweedfs namespace from metadata: %w", err))
+	if len(ext.Charts) == 0 {
+		// This should not happen
+		err := errors.NewFatalError(fmt.Errorf("seaweedfs chart not found"))
 		return nil, op, err
 	}
+	chart := ext.Charts[0]
 
-	secretName, err := getSeaweedfsS3SecretNameFromMetadata(metadata)
+	namespace := chart.TargetNS
+
+	secretName, err := getSeaweedfsS3SecretNameFromHelmExtension(ext)
 	if err != nil {
-		err = errors.NewFatalError(fmt.Errorf("get seaweedfs s3 secret name from metadata: %w", err))
+		// This should not happen
+		err = errors.NewFatalError(fmt.Errorf("get seaweedfs s3 secret name from helm extension: %w", err))
 		return nil, op, err
 	}
 
@@ -171,21 +151,7 @@ func ensureSeaweedfsS3Secret(ctx context.Context, in *clusterv1beta1.Installatio
 	return &config, op, nil
 }
 
-func ensureSeaweedfsNamespace(ctx context.Context, cli client.Client, namespace string) error {
-	obj := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{Name: namespace},
-	}
-
-	err := cli.Create(ctx, obj)
-	if err != nil && !k8serrors.IsAlreadyExists(err) {
-		return fmt.Errorf("create seaweedfs namespace: %w", err)
-
-	}
-
-	return nil
-}
-
-func ensureRegistryS3Secret(ctx context.Context, in *clusterv1beta1.Installation, metadata *ectypes.ReleaseMetadata, cli client.Client, sfsConfig *seaweedfsConfig) (controllerutil.OperationResult, error) {
+func ensureRegistryS3Secret(ctx context.Context, in *clusterv1beta1.Installation, cli client.Client, ext k0sv1beta1.HelmExtensions, sfsConfig *seaweedfsConfig) (controllerutil.OperationResult, error) {
 	op := controllerutil.OperationResultNone
 
 	sfsCreds, ok := sfsConfig.getCredentials("anvAdmin")
@@ -193,16 +159,20 @@ func ensureRegistryS3Secret(ctx context.Context, in *clusterv1beta1.Installation
 		return op, fmt.Errorf("seaweedfs s3 anvAdmin credentials not found")
 	}
 
-	namespace, err := getRegistryNamespaceFromMetadata(metadata)
-	if err != nil {
-		// TODO: this is a fatal error, should we return it?
-		return op, fmt.Errorf("get registry namespace from metadata: %w", err)
+	if len(ext.Charts) == 0 {
+		// This should not happen
+		err := errors.NewFatalError(fmt.Errorf("seaweedfs chart not found"))
+		return op, err
 	}
+	chart := ext.Charts[0]
 
-	secretName, err := getRegistryS3SecretNameFromMetadata(metadata)
+	namespace := chart.TargetNS
+
+	secretName, err := getRegistryS3SecretNameFromHelmExtension(ext)
 	if err != nil {
-		// TODO: this is a fatal error, should we return it?
-		return op, fmt.Errorf("get registry s3 secret name from metadata: %w", err)
+		// This should not happen
+		err = errors.NewFatalError(fmt.Errorf("get registry s3 secret name from helm extension: %w", err))
+		return op, err
 	}
 
 	err = ensureRegistryNamespace(ctx, cli, namespace)
@@ -235,6 +205,20 @@ func ensureRegistryS3Secret(ctx context.Context, in *clusterv1beta1.Installation
 	return op, nil
 }
 
+func ensureSeaweedfsNamespace(ctx context.Context, cli client.Client, namespace string) error {
+	obj := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{Name: namespace},
+	}
+
+	err := cli.Create(ctx, obj)
+	if err != nil && !k8serrors.IsAlreadyExists(err) {
+		return fmt.Errorf("create seaweedfs namespace: %w", err)
+
+	}
+
+	return nil
+}
+
 func ensureRegistryNamespace(ctx context.Context, cli client.Client, namespace string) error {
 	obj := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{Name: namespace},
@@ -246,4 +230,22 @@ func ensureRegistryNamespace(ctx context.Context, cli client.Client, namespace s
 	}
 
 	return nil
+}
+
+func getRegistryS3SecretReadyCondition(in *clusterv1beta1.Installation, status metav1.ConditionStatus, reason string, message string) metav1.Condition {
+	return getCondition(in, RegistryS3SecretReadyConditionType, status, reason, message)
+}
+
+func getSeaweedfsS3SecretReadyCondition(in *clusterv1beta1.Installation, status metav1.ConditionStatus, reason string, message string) metav1.Condition {
+	return getCondition(in, SeaweedfsS3SecretReadyConditionType, status, reason, message)
+}
+
+func getCondition(in *clusterv1beta1.Installation, conditionType string, status metav1.ConditionStatus, reason string, message string) metav1.Condition {
+	return metav1.Condition{
+		Type:               conditionType,
+		Status:             status,
+		Reason:             reason,
+		Message:            message,
+		ObservedGeneration: in.Generation,
+	}
 }

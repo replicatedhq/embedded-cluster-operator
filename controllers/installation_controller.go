@@ -635,9 +635,8 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 	}
 
 	log := ctrl.LoggerFrom(ctx)
-	// skip if the installer has already completed, failed or if the k0s upgrade is still in progress
+	// skip if the installer has already failed or if the k0s upgrade is still in progress
 	if in.Status.State == v1beta1.InstallationStateFailed ||
-		in.Status.State == v1beta1.InstallationStateInstalled ||
 		!in.Status.GetKubernetesInstalled() {
 		log.Info("Skipping helm chart reconciliation", "state", in.Status.State)
 		return nil

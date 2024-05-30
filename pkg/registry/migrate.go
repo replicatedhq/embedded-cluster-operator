@@ -103,6 +103,27 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, m
 					},
 					InitContainers: []corev1.Container{
 						{
+							Name:    "wait-for-seaweed",
+							Image:   "amazon/aws-cli:latest", // TODO improve this
+							Command: []string{"sh", "-c"},
+							Args: []string{`
+         while ! aws s3 ls s3:// --endpoint-url=http://seaweedfs-s3.seaweedfs:8333; then
+           echo "waiting for seaweedfs-s3 to be ready"
+           sleep 5
+         fi
+         echo "seaweedfs-s3 is ready"
+`},
+							EnvFrom: []corev1.EnvFromSource{
+								{
+									SecretRef: &corev1.SecretEnvSource{
+										LocalObjectReference: corev1.LocalObjectReference{
+											Name: registryS3CredsSecret,
+										},
+									},
+								},
+							},
+						},
+						{
 							Name:    "migrate-registry-data",
 							Image:   "amazon/aws-cli:latest", // TODO improve this
 							Command: []string{"sh", "-c"},
@@ -131,9 +152,18 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, m
 					},
 					Containers: []corev1.Container{
 						{
-							Name:    "create-success-secret",
-							Image:   "busybox:latest",
-							Command: []string{}, // TODO
+							Name:  "create-success-secret",
+							Image: "bitnami/kubectl:1.29.5", // TODO make this dynamic, ensure it's included in the airgap bundle
+							Command: []string{
+								"kubectl",
+								"create",
+								"secret",
+								"generic",
+								"-n",
+								ns,
+								registryDataMigrationCompleteSecretName,
+								"--from-literal=registry=migrated",
+							},
 						},
 					},
 				},

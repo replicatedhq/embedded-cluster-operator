@@ -16,7 +16,7 @@ const registryDataMigrationCompleteSecretName = "registry-data-migration-complet
 const registryDataMigrationJobName = "registry-data-migration"
 
 const RegistryMigrationStatusConditionType = "RegistryMigrationStatus"
-const RegistryMigrationRoleName = "registry-data-migration-role"
+const RegistryMigrationServiceAccountName = "registry-data-migration-serviceaccount"
 
 // MigrateRegistryData should be called when transitioning from non-HA to HA airgapped installations
 // this function scales down the registry deployment to 0 replicas, then creates a job that will migrate the data before
@@ -76,7 +76,7 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, c
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					RestartPolicy:      corev1.RestartPolicyOnFailure,
-					ServiceAccountName: RegistryMigrationRoleName,
+					ServiceAccountName: RegistryMigrationServiceAccountName,
 					Volumes: []corev1.Volume{
 						{
 							Name: "registry-data",

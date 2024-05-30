@@ -92,29 +92,29 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, c
 							Name:    "scale-down-registry",
 							Image:   "bitnami/kubectl:1.29.5", // TODO make this dynamic, ensure it's included in the airgap bundle
 							Command: []string{"sh", "-c"},
-							Args:    []string{`kubectl scale deployment registry -n ` + RegistryNamespace + ` --replicas=0 || sleep 10000`},
+							Args:    []string{`kubectl scale deployment registry -n ` + RegistryNamespace + ` --replicas=0`},
 						},
-						{
-							Name:    "wait-for-seaweed",
-							Image:   "amazon/aws-cli:latest", // TODO improve this
-							Command: []string{"sh", "-c"},
-							Args: []string{`
-         while ! aws s3 ls s3:// --endpoint-url=http://seaweedfs-s3.seaweedfs:8333; then
-           echo "waiting for seaweedfs-s3 to be ready"
-           sleep 5
-         fi
-         echo "seaweedfs-s3 is ready"
-`},
-							EnvFrom: []corev1.EnvFromSource{
-								{
-									SecretRef: &corev1.SecretEnvSource{
-										LocalObjectReference: corev1.LocalObjectReference{
-											Name: RegistryS3SecretName,
-										},
-									},
-								},
-							},
-						},
+						//						{
+						//							Name:    "wait-for-seaweed",
+						//							Image:   "amazon/aws-cli:latest", // TODO improve this
+						//							Command: []string{"sh", "-c"},
+						//							Args: []string{`
+						//         while ! aws s3 ls s3:// --endpoint-url=http://seaweedfs-s3.seaweedfs:8333; then
+						//           echo "waiting for seaweedfs-s3 to be ready"
+						//           sleep 5
+						//         fi
+						//         echo "seaweedfs-s3 is ready"
+						//`},
+						//							EnvFrom: []corev1.EnvFromSource{
+						//								{
+						//									SecretRef: &corev1.SecretEnvSource{
+						//										LocalObjectReference: corev1.LocalObjectReference{
+						//											Name: RegistryS3SecretName,
+						//										},
+						//									},
+						//								},
+						//							},
+						//						},
 						{
 							Name:    "migrate-registry-data",
 							Image:   "amazon/aws-cli:latest", // TODO improve this
@@ -147,7 +147,7 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, c
 							Name:    "create-success-secret",
 							Image:   "bitnami/kubectl:1.29.5", // TODO make this dynamic, ensure it's included in the airgap bundle
 							Command: []string{"sh", "-c"},
-							Args:    []string{`kubectl create secret generic -n ` + RegistryNamespace + ` ` + registryDataMigrationCompleteSecretName + `--from-literal=registry=migrated  || sleep 10000`},
+							Args:    []string{`kubectl create secret generic -n ` + RegistryNamespace + ` ` + registryDataMigrationCompleteSecretName + `--from-literal=registry=migrated`},
 						},
 					},
 				},

@@ -67,6 +67,11 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, m
 		return nil
 	}
 
+	registryS3CredsSecret, err := getRegistryS3SecretNameFromMetadata(metadata)
+	if err != nil {
+		return fmt.Errorf("get registry s3 secret name from metadata: %w", err)
+	}
+
 	// create the migration job
 	migrationJob = batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -77,7 +82,57 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, m
 			Kind:       "Job",
 			APIVersion: "batch/v1",
 		},
-		Spec: batchv1.JobSpec{},
+		Spec: batchv1.JobSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Volumes: []corev1.Volume{
+						{
+							Name: "registry-data",
+							VolumeSource: corev1.VolumeSource{
+								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+									ClaimName: "TODO-GET-REGISTRY-PVC-NAME",
+								},
+							},
+						},
+					},
+					InitContainers: []corev1.Container{
+						{
+							Name:    "migrate-registry-data",
+							Image:   "amazon/aws-cli:latest", // TODO improve this
+							Command: []string{"sh", "-c"},
+							Args: []string{`
+         if ! aws s3 ls s3://registry --endpoint-url=http://seaweedfs-s3.seaweedfs:8333; then
+           aws s3api create-bucket --bucket registry --endpoint-url=http://seaweedfs-s3.seaweedfs:8333
+         fi
+         aws s3 sync /var/lib/embedded-cluster/registry/ s3://registry/ --endpoint-url=http://seaweedfs-s3.seaweedfs:8333
+`},
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "registry-data",
+									MountPath: "/var/lib/embedded-cluster/registry",
+								},
+							},
+							EnvFrom: []corev1.EnvFromSource{
+								{
+									SecretRef: &corev1.SecretEnvSource{
+										LocalObjectReference: corev1.LocalObjectReference{
+											Name: registryS3CredsSecret,
+										},
+									},
+								},
+							},
+						},
+					},
+					Containers: []corev1.Container{
+						{
+							Name:    "create-success-secret",
+							Image:   "busybox:latest",
+							Command: []string{}, // TODO
+						},
+					},
+				},
+			},
+		},
 	}
 	if err := cli.Create(ctx, &migrationJob); err != nil {
 		return fmt.Errorf("create migration job: %w", err)

@@ -67,6 +67,8 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, m
 		return nil
 	}
 
+	// TODO: scale down the existing registry deployment
+
 	registryS3CredsSecret, err := getRegistryS3SecretNameFromMetadata(metadata)
 	if err != nil {
 		return fmt.Errorf("get registry s3 secret name from metadata: %w", err)

@@ -86,6 +86,7 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, m
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyOnFailure,
 					Volumes: []corev1.Volume{
 						{
 							Name: "registry-data",

@@ -26,7 +26,7 @@ func Test_localMetadataFor(t *testing.T) {
 				"Charts": [
 					{
 						"Name": "docker-registry",
-						"Values": "{}"
+						"Values": "ha: false\n"
 					}
 				]
 			},
@@ -34,7 +34,7 @@ func Test_localMetadataFor(t *testing.T) {
 				"Charts": [
 					{
 						"Name": "docker-registry",
-						"Values": "{}"
+						"Values": "ha: true\n"
 					}
 				]
 			}
@@ -76,7 +76,7 @@ func Test_localMetadataFor(t *testing.T) {
 						Charts: v1beta1.ChartsSettings{
 							{
 								Name:   "docker-registry",
-								Values: "{}",
+								Values: "ha: false\n",
 							},
 						},
 					},
@@ -84,7 +84,7 @@ func Test_localMetadataFor(t *testing.T) {
 						Charts: v1beta1.ChartsSettings{
 							{
 								Name:   "docker-registry",
-								Values: "{}",
+								Values: "ha: true\n",
 							},
 						},
 					},
@@ -122,7 +122,7 @@ func Test_localMetadataFor(t *testing.T) {
 						Charts: v1beta1.ChartsSettings{
 							{
 								Name:   "docker-registry",
-								Values: "tlsSecretName: registry-tls\n",
+								Values: "ha: false\ntlsSecretName: registry-tls\n",
 							},
 						},
 					},
@@ -130,7 +130,7 @@ func Test_localMetadataFor(t *testing.T) {
 						Charts: v1beta1.ChartsSettings{
 							{
 								Name:   "docker-registry",
-								Values: "tlsSecretName: registry-tls\n",
+								Values: "ha: true\ntlsSecretName: registry-tls\n",
 							},
 						},
 					},

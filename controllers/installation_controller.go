@@ -132,8 +132,8 @@ var copyHostPreflightResultsJob = &batchv1.Job{
 		Namespace: ecNamespace,
 	},
 	Spec: batchv1.JobSpec{
-		BackoffLimit: ptr.To[int32](2),
-		TTLSecondsAfterFinished: ptr.To[int32](0),	// we don't want to keep the job around. Delete immediately after it finishes.
+		BackoffLimit:            ptr.To[int32](2),
+		TTLSecondsAfterFinished: ptr.To[int32](0), // we don't want to keep the job around. Delete immediately after it finishes.
 		Template: corev1.PodTemplateSpec{
 			Spec: corev1.PodSpec{
 				ServiceAccountName: "embedded-cluster-operator",
@@ -158,16 +158,16 @@ var copyHostPreflightResultsJob = &batchv1.Job{
 							"-e",
 							"-c",
 							"if [ -f /var/lib/embedded-cluster/support/host-preflight-results.json ]; " +
-							"then " +
-								"/var/lib/embedded-cluster/bin/kubectl create configmap ${EC_NODE_NAME}-host-preflight-results " +
+								"then " +
+								"/var/lib/embedded-cluster/bin/kubectl create configmap ${HSPF_CM_NAME} " +
 								"--from-file=results.json=/var/lib/embedded-cluster/support/host-preflight-results.json " +
 								"-n embedded-cluster --dry-run=client -oyaml | " +
 								"/var/lib/embedded-cluster/bin/kubectl label -f - embedded-cluster/host-preflight-result=${EC_NODE_NAME} --local -o yaml | " +
 								"/var/lib/embedded-cluster/bin/kubectl apply -f - && " +
-								"/var/lib/embedded-cluster/bin/kubectl annotate configmap ${EC_NODE_NAME}-host-preflight-results \"update-timestamp=$(date +'%Y-%m-%dT%H:%M:%SZ')\" --overwrite; " +
-							"else " +
+								"/var/lib/embedded-cluster/bin/kubectl annotate configmap ${HSPF_CM_NAME} \"update-timestamp=$(date +'%Y-%m-%dT%H:%M:%SZ')\" --overwrite; " +
+								"else " +
 								"echo '/var/lib/embedded-cluster/support/host-preflight-results.json does not exist'; " +
-							"fi",
+								"fi",
 						},
 						VolumeMounts: []corev1.VolumeMount{
 							{
@@ -1060,6 +1060,7 @@ func constructHostPreflightResultsJob(nodeName, installationName string) *batchv
 	job.Spec.Template.Spec.Containers[0].Env = append(
 		job.Spec.Template.Spec.Containers[0].Env,
 		corev1.EnvVar{Name: "EC_NODE_NAME", Value: nodeName},
+		corev1.EnvVar{Name: "HSPF_CM_NAME", Value: util.NameWithLengthLimit(nodeName, "-host-preflight-results")},
 	)
 
 	return job

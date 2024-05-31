@@ -158,7 +158,7 @@ func updateInfraChartsFromInstall(ctx context.Context, in *v1beta1.Installation,
 			charts[i].Values = newVals
 		}
 		if chart.Name == "docker-registry" {
-			if in == nil || !in.Spec.AirGap || !in.Spec.HighAvailability {
+			if !in.Spec.AirGap || !in.Spec.HighAvailability {
 				continue
 			}
 

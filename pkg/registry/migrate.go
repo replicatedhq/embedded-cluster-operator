@@ -20,8 +20,8 @@ const RegistryMigrationStatusConditionType = "RegistryMigrationStatus"
 const RegistryMigrationServiceAccountName = "registry-data-migration-serviceaccount"
 
 // MigrateRegistryData should be called when transitioning from non-HA to HA airgapped installations
-// this function scales down the registry deployment to 0 replicas, then creates a job that will migrate the data before
-// creating a 'migration is complete' secret in the registry namespace
+// this function creates a job that will scale down the registry deployment then upload the data to s3
+// before finally creating a 'migration is complete' secret in the registry namespace
 // if this secret is present, the function will return without reattempting the migration
 func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, cli client.Client) error {
 	hasMigrated, err := HasRegistryMigrated(ctx, cli)

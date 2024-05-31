@@ -40,7 +40,7 @@ func LocalVersionMetadataConfigmap(version string) types.NamespacedName {
 
 // configureRegistryTLS makes sure that the docker-registry values contains an entry for the
 // tls secret. this function should be called only if the tls secret exists.
-func configureRegistryTLS(meta *ectypes.ReleaseMetadata, ext k0sv1beta1.HelmExtensions) error {
+func configureRegistryTLS(meta *ectypes.ReleaseMetadata, ext *k0sv1beta1.HelmExtensions) error {
 	for i, chart := range ext.Charts {
 		if chart.Name != "docker-registry" {
 			continue
@@ -108,7 +108,7 @@ func localMetadataFor(ctx context.Context, cli client.Client, version string) (*
 
 	registryExt, ok := meta.BuiltinConfigs["registry"]
 	if ok {
-		err := configureRegistryTLS(meta, registryExt)
+		err := configureRegistryTLS(meta, &registryExt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to configure registry-ha tls: %w", err)
 		}
@@ -116,7 +116,7 @@ func localMetadataFor(ctx context.Context, cli client.Client, version string) (*
 
 	registryHAExt, ok := meta.BuiltinConfigs["registry-ha"]
 	if ok {
-		err := configureRegistryTLS(meta, registryHAExt)
+		err := configureRegistryTLS(meta, &registryHAExt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to configure registry tls: %w", err)
 		}

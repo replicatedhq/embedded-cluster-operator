@@ -99,10 +99,10 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, c
 							Image:   "amazon/aws-cli:latest", // TODO improve this
 							Command: []string{"sh", "-c"},
 							Args: []string{`
-						        while ! aws s3 ls --endpoint-url=http://seaweedfs-s3.seaweedfs:8333; then
+						        while ! aws s3 ls --endpoint-url=http://seaweedfs-s3.seaweedfs:8333; do
 						          echo "waiting for seaweedfs-s3 to be ready"
 						          sleep 5
-						        fi
+						        done
 						        echo "seaweedfs-s3 is ready"
 							`},
 							Env: []corev1.EnvVar{

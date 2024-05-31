@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -40,6 +41,10 @@ func registryData() error {
 	conf, err := config.LoadDefaultConfig(context.TODO(),
 		config.WithCredentialsProvider(creds),
 		config.WithRegion("us-east-1"),
+		config.WithEndpointResolverWithOptions(
+			aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+				return aws.Endpoint{URL: "http://seaweedfs-s3.seaweedfs:8333"}, nil
+			})),
 	)
 	if err != nil {
 		return fmt.Errorf("load aws config: %w", err)

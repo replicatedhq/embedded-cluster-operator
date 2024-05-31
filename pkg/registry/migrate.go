@@ -3,6 +3,7 @@ package registry
 import (
 	"context"
 	"fmt"
+	"os"
 
 	clusterv1beta1 "github.com/replicatedhq/embedded-cluster-kinds/apis/v1beta1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -90,86 +91,32 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, c
 					InitContainers: []corev1.Container{
 						{
 							Name:    "scale-down-registry",
-							Image:   "bitnami/kubectl:1.29.5", // TODO make this dynamic, ensure it's included in the airgap bundle
-							Command: []string{"sh", "-c"},
-							Args:    []string{`kubectl scale deployment registry -n ` + registryNamespace + ` --replicas=0`},
+							Image:   os.Getenv("EMBEDDEDCLUSTER_IMAGE"),
+							Command: []string{"/manager"},
+							Args:    []string{`--migrate=registry-scale`},
 						},
-						{
-							Name:    "wait-for-seaweed",
-							Image:   "amazon/aws-cli:latest", // TODO improve this
-							Command: []string{"sh", "-c"},
-							Args: []string{`
-						        while ! aws s3 ls --endpoint-url=http://seaweedfs-s3.seaweedfs:8333; do
-						          echo "waiting for seaweedfs-s3 to be ready"
-						          sleep 5
-						        done
-						        echo "seaweedfs-s3 is ready"
-							`},
-							Env: []corev1.EnvVar{
-								{
-									Name: "AWS_ACCESS_KEY_ID",
-									ValueFrom: &corev1.EnvVarSource{
-										SecretKeyRef: &corev1.SecretKeySelector{
-											LocalObjectReference: corev1.LocalObjectReference{Name: registryS3SecretName},
-											Key:                  "s3AccessKey",
-										},
-									},
-								},
-								{
-									Name: "AWS_SECRET_ACCESS_KEY",
-									ValueFrom: &corev1.EnvVarSource{
-										SecretKeyRef: &corev1.SecretKeySelector{
-											LocalObjectReference: corev1.LocalObjectReference{Name: registryS3SecretName},
-											Key:                  "s3SecretKey",
-										},
-									},
-								},
-							},
-						},
+					},
+					Containers: []corev1.Container{
 						{
 							Name:    "migrate-registry-data",
-							Image:   "amazon/aws-cli:latest", // TODO improve this
-							Command: []string{"sh", "-c"},
-							Args: []string{`
-         if ! aws s3 ls s3://registry --endpoint-url=http://seaweedfs-s3.seaweedfs:8333; then
-           aws s3api create-bucket --bucket registry --endpoint-url=http://seaweedfs-s3.seaweedfs:8333
-         fi
-         aws s3 sync /var/lib/embedded-cluster/registry/ s3://registry/ --endpoint-url=http://seaweedfs-s3.seaweedfs:8333
-`},
+							Image:   os.Getenv("EMBEDDEDCLUSTER_IMAGE"),
+							Command: []string{"/manager"},
+							Args:    []string{`--migrate=registry-data`},
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "registry-data",
 									MountPath: "/var/lib/embedded-cluster/registry",
 								},
 							},
-							Env: []corev1.EnvVar{
+							EnvFrom: []corev1.EnvFromSource{
 								{
-									Name: "AWS_ACCESS_KEY_ID",
-									ValueFrom: &corev1.EnvVarSource{
-										SecretKeyRef: &corev1.SecretKeySelector{
-											LocalObjectReference: corev1.LocalObjectReference{Name: registryS3SecretName},
-											Key:                  "s3AccessKey",
-										},
-									},
-								},
-								{
-									Name: "AWS_SECRET_ACCESS_KEY",
-									ValueFrom: &corev1.EnvVarSource{
-										SecretKeyRef: &corev1.SecretKeySelector{
-											LocalObjectReference: corev1.LocalObjectReference{Name: registryS3SecretName},
-											Key:                  "s3SecretKey",
+									SecretRef: &corev1.SecretEnvSource{
+										LocalObjectReference: corev1.LocalObjectReference{
+											Name: registryS3SecretName,
 										},
 									},
 								},
 							},
-						},
-					},
-					Containers: []corev1.Container{
-						{
-							Name:    "create-success-secret",
-							Image:   "bitnami/kubectl:1.29.5", // TODO make this dynamic, ensure it's included in the airgap bundle
-							Command: []string{"sh", "-c"},
-							Args:    []string{`kubectl create secret generic -n ` + registryNamespace + ` ` + registryDataMigrationCompleteSecretName + `--from-literal=registry=migrated`},
 						},
 					},
 				},

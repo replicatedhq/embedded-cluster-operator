@@ -40,7 +40,7 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, c
 	// check if the migration is already in progress
 	// if it is, return without reattempting the migration
 	migrationJob := batchv1.Job{}
-	err = cli.Get(ctx, client.ObjectKey{Namespace: RegistryNamespace, Name: registryDataMigrationJobName}, &migrationJob)
+	err = cli.Get(ctx, client.ObjectKey{Namespace: registryNamespace, Name: registryDataMigrationJobName}, &migrationJob)
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			return fmt.Errorf("get migration job: %w", err)
@@ -66,7 +66,7 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, c
 	migrationJob = batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      registryDataMigrationJobName,
-			Namespace: RegistryNamespace,
+			Namespace: registryNamespace,
 		},
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Job",
@@ -92,7 +92,7 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, c
 							Name:    "scale-down-registry",
 							Image:   "bitnami/kubectl:1.29.5", // TODO make this dynamic, ensure it's included in the airgap bundle
 							Command: []string{"sh", "-c"},
-							Args:    []string{`kubectl scale deployment registry -n ` + RegistryNamespace + ` --replicas=0`},
+							Args:    []string{`kubectl scale deployment registry -n ` + registryNamespace + ` --replicas=0`},
 						},
 						{
 							Name:    "wait-for-seaweed",
@@ -110,7 +110,7 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, c
 									Name: "AWS_ACCESS_KEY_ID",
 									ValueFrom: &corev1.EnvVarSource{
 										SecretKeyRef: &corev1.SecretKeySelector{
-											LocalObjectReference: corev1.LocalObjectReference{Name: RegistryS3SecretName},
+											LocalObjectReference: corev1.LocalObjectReference{Name: registryS3SecretName},
 											Key:                  "s3AccessKey",
 										},
 									},
@@ -119,7 +119,7 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, c
 									Name: "AWS_SECRET_ACCESS_KEY",
 									ValueFrom: &corev1.EnvVarSource{
 										SecretKeyRef: &corev1.SecretKeySelector{
-											LocalObjectReference: corev1.LocalObjectReference{Name: RegistryS3SecretName},
+											LocalObjectReference: corev1.LocalObjectReference{Name: registryS3SecretName},
 											Key:                  "s3SecretKey",
 										},
 									},
@@ -147,7 +147,7 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, c
 									Name: "AWS_ACCESS_KEY_ID",
 									ValueFrom: &corev1.EnvVarSource{
 										SecretKeyRef: &corev1.SecretKeySelector{
-											LocalObjectReference: corev1.LocalObjectReference{Name: RegistryS3SecretName},
+											LocalObjectReference: corev1.LocalObjectReference{Name: registryS3SecretName},
 											Key:                  "s3AccessKey",
 										},
 									},
@@ -156,7 +156,7 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, c
 									Name: "AWS_SECRET_ACCESS_KEY",
 									ValueFrom: &corev1.EnvVarSource{
 										SecretKeyRef: &corev1.SecretKeySelector{
-											LocalObjectReference: corev1.LocalObjectReference{Name: RegistryS3SecretName},
+											LocalObjectReference: corev1.LocalObjectReference{Name: registryS3SecretName},
 											Key:                  "s3SecretKey",
 										},
 									},
@@ -169,7 +169,7 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, c
 							Name:    "create-success-secret",
 							Image:   "bitnami/kubectl:1.29.5", // TODO make this dynamic, ensure it's included in the airgap bundle
 							Command: []string{"sh", "-c"},
-							Args:    []string{`kubectl create secret generic -n ` + RegistryNamespace + ` ` + registryDataMigrationCompleteSecretName + `--from-literal=registry=migrated`},
+							Args:    []string{`kubectl create secret generic -n ` + registryNamespace + ` ` + registryDataMigrationCompleteSecretName + `--from-literal=registry=migrated`},
 						},
 					},
 				},
@@ -199,7 +199,7 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, c
 // HasRegistryMigrated checks if the registry data has been migrated by looking for the 'migration complete' secret in the registry namespace
 func HasRegistryMigrated(ctx context.Context, cli client.Client) (bool, error) {
 	sec := corev1.Secret{}
-	err := cli.Get(ctx, client.ObjectKey{Namespace: RegistryNamespace, Name: registryDataMigrationCompleteSecretName}, &sec)
+	err := cli.Get(ctx, client.ObjectKey{Namespace: registryNamespace, Name: registryDataMigrationCompleteSecretName}, &sec)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return false, nil

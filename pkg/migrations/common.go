@@ -1,15 +1,16 @@
 package migrations
 
 import (
+	"context"
 	"fmt"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
-func Run(migration string) error {
+func Run(ctx context.Context, migration string) error {
 	if migration == "registry-data" {
-		return registryData()
+		return registryData(ctx)
 	}
 
 	return fmt.Errorf("unknown migration: %s", migration)

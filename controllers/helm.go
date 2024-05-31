@@ -15,8 +15,8 @@ import (
 
 	"github.com/replicatedhq/embedded-cluster-kinds/apis/v1beta1"
 	ectypes "github.com/replicatedhq/embedded-cluster-kinds/types"
+	"github.com/replicatedhq/embedded-cluster-operator/pkg/k8sutil"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/registry"
-	"github.com/replicatedhq/embedded-cluster-operator/pkg/util"
 )
 
 const DEFAULT_VENDOR_CHART_ORDER = 10
@@ -78,7 +78,7 @@ func mergeHelmConfigs(ctx context.Context, meta *ectypes.ReleaseMetadata, in *v1
 				combinedConfigs.Repositories = append(combinedConfigs.Repositories, seaweedfsConfig.Repositories...)
 			}
 
-			migrationStatus := util.CheckConditionStatus(in.Status, registry.RegistryMigrationStatusConditionType)
+			migrationStatus := k8sutil.CheckConditionStatus(in.Status, registry.RegistryMigrationStatusConditionType)
 			if migrationStatus == metav1.ConditionTrue {
 				registryConfig, ok := meta.BuiltinConfigs["registry-ha"]
 				if ok {

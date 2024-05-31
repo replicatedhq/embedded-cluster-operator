@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -80,7 +81,7 @@ func main() {
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	if migration != "" {
-		err := migrations.Run(migration)
+		err := migrations.Run(context.TODO(), migration)
 		if err != nil {
 			setupLog.Error(err, fmt.Sprintf("failed to run migration %q", migration))
 			os.Exit(1)

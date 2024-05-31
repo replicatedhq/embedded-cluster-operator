@@ -6,10 +6,12 @@ import (
 	"os"
 
 	clusterv1beta1 "github.com/replicatedhq/embedded-cluster-kinds/apis/v1beta1"
+	"github.com/replicatedhq/embedded-cluster-operator/pkg/k8sutil"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -24,6 +26,11 @@ const RegistryMigrationServiceAccountName = "registry-data-migration-serviceacco
 // before finally creating a 'migration is complete' secret in the registry namespace
 // if this secret is present, the function will return without reattempting the migration
 func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, cli client.Client) error {
+	migrationStatus := k8sutil.CheckConditionStatus(in.Status, RegistryMigrationStatusConditionType)
+	if migrationStatus == metav1.ConditionTrue {
+		return nil
+	}
+
 	hasMigrated, err := HasRegistryMigrated(ctx, cli)
 	if err != nil {
 		return fmt.Errorf("check if registry has migrated before running migration: %w", err)
@@ -64,7 +71,53 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, c
 	}
 
 	// create the migration job
-	migrationJob = batchv1.Job{
+	migrationJob, err = newMigrationJob(in, cli)
+	if err != nil {
+		in.Status.SetCondition(metav1.Condition{
+			Type:               RegistryMigrationStatusConditionType,
+			Status:             metav1.ConditionFalse,
+			Reason:             "MigrationJobFailedBuild",
+			ObservedGeneration: in.Generation,
+		})
+		return fmt.Errorf("build migration job: %w", err)
+	}
+
+	if err := cli.Create(ctx, &migrationJob); err != nil {
+		in.Status.SetCondition(metav1.Condition{
+			Type:               RegistryMigrationStatusConditionType,
+			Status:             metav1.ConditionFalse,
+			Reason:             "MigrationJobFailedCreation",
+			ObservedGeneration: in.Generation,
+		})
+		return fmt.Errorf("create migration job: %w", err)
+	}
+
+	in.Status.SetCondition(metav1.Condition{
+		Type:               RegistryMigrationStatusConditionType,
+		Status:             metav1.ConditionFalse,
+		Reason:             "MigrationJobInProgress",
+		ObservedGeneration: in.Generation,
+	})
+
+	return nil
+}
+
+// HasRegistryMigrated checks if the registry data has been migrated by looking for the 'migration complete' secret in the registry namespace
+func HasRegistryMigrated(ctx context.Context, cli client.Client) (bool, error) {
+	sec := corev1.Secret{}
+	err := cli.Get(ctx, client.ObjectKey{Namespace: registryNamespace, Name: RegistryDataMigrationCompleteSecretName}, &sec)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("get registry migration secret: %w", err)
+	}
+
+	return true, nil
+}
+
+func newMigrationJob(in *clusterv1beta1.Installation, cli client.Client) (batchv1.Job, error) {
+	job := batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      registryDataMigrationJobName,
 			Namespace: registryNamespace,
@@ -115,36 +168,13 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, c
 			},
 		},
 	}
-	if err := cli.Create(ctx, &migrationJob); err != nil {
-		in.Status.SetCondition(metav1.Condition{
-			Type:               RegistryMigrationStatusConditionType,
-			Status:             metav1.ConditionFalse,
-			Reason:             "MigrationJobFailedCreation",
-			ObservedGeneration: in.Generation,
-		})
-		return fmt.Errorf("create migration job: %w", err)
-	}
 
-	in.Status.SetCondition(metav1.Condition{
-		Type:               RegistryMigrationStatusConditionType,
-		Status:             metav1.ConditionFalse,
-		Reason:             "MigrationJobInProgress",
-		ObservedGeneration: in.Generation,
-	})
-
-	return nil
-}
-
-// HasRegistryMigrated checks if the registry data has been migrated by looking for the 'migration complete' secret in the registry namespace
-func HasRegistryMigrated(ctx context.Context, cli client.Client) (bool, error) {
-	sec := corev1.Secret{}
-	err := cli.Get(ctx, client.ObjectKey{Namespace: registryNamespace, Name: RegistryDataMigrationCompleteSecretName}, &sec)
+	err := ctrl.SetControllerReference(in, &job, cli.Scheme())
 	if err != nil {
-		if errors.IsNotFound(err) {
-			return false, nil
-		}
-		return false, fmt.Errorf("get registry migration secret: %w", err)
+		return batchv1.Job{}, fmt.Errorf("set controller reference: %w", err)
 	}
 
-	return true, nil
+	job.ObjectMeta.Labels = k8sutil.ApplyCommonLabels(job.ObjectMeta.Labels, in, registryDataMigrationJobName)
+
+	return job, nil
 }

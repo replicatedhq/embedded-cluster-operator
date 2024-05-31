@@ -21,25 +21,26 @@ import (
 // registryData copies data from the disk (/var/lib/embedded-cluster/registry) to the seaweedfs s3 store.
 // if it fails, it will scale the registry deployment back to 1.
 // if it succeeds, it will create a secret used to indicate success to the operator.
-func registryData() error {
+func registryData(ctx context.Context) error {
 	// if the migration fails, we need to scale the registry back to 1
 	success := false
 	defer func() {
 		if !success {
-			err := registryScale(1)
+			// this should use the background context as we want it to run even if the context expired
+			err := registryScale(context.Background(), 1)
 			if err != nil {
 				fmt.Printf("Failed to scale registry back to 1 replica: %v\n", err)
 			}
 		}
 	}()
-	err := registryScale(0)
+	err := registryScale(ctx, 0)
 	if err != nil {
 		return fmt.Errorf("failed to scale registry to 0 replicas before uploading data: %w", err)
 	}
 
 	fmt.Printf("Connecting to s3\n")
 	creds := credentials.NewStaticCredentialsProvider(os.Getenv("s3AccessKey"), os.Getenv("s3SecretKey"), "")
-	conf, err := config.LoadDefaultConfig(context.TODO(),
+	conf, err := config.LoadDefaultConfig(ctx,
 		config.WithCredentialsProvider(creds),
 		config.WithRegion("us-east-1"),
 		config.WithEndpointResolverWithOptions(
@@ -55,7 +56,7 @@ func registryData() error {
 		o.UsePathStyle = true
 	})
 	registryStr := "registry"
-	_, err = s3Client.CreateBucket(context.TODO(), &s3.CreateBucketInput{
+	_, err = s3Client.CreateBucket(ctx, &s3.CreateBucketInput{
 		Bucket: &registryStr,
 	})
 	if err != nil {
@@ -82,7 +83,7 @@ func registryData() error {
 		}
 
 		fmt.Printf("uploading %s, size %d\n", relPath, info.Size())
-		_, err = s3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		_, err = s3Client.PutObject(ctx, &s3.PutObjectInput{
 			Bucket: &registryStr,
 			Body:   f,
 			Key:    &relPath,
@@ -116,7 +117,7 @@ func registryData() error {
 			"migration": []byte("complete"),
 		},
 	}
-	err = cli.Create(context.TODO(), &migrationSecret)
+	err = cli.Create(ctx, &migrationSecret)
 	if err != nil {
 		return fmt.Errorf("create registry data migration secret: %w", err)
 	}
@@ -128,7 +129,7 @@ func registryData() error {
 
 // registryScale scales the registry deployment to the given replica count.
 // '0' and '1' are the only acceptable values.
-func registryScale(scale int32) error {
+func registryScale(ctx context.Context, scale int32) error {
 	if scale != 0 && scale != 1 {
 		return fmt.Errorf("invalid scale: %d", scale)
 	}
@@ -141,7 +142,7 @@ func registryScale(scale int32) error {
 	fmt.Printf("Finding current registry deployment\n")
 
 	currentRegistry := &appsv1.Deployment{}
-	err = cli.Get(context.TODO(), client.ObjectKey{Namespace: registry.RegistryNamespace(), Name: "registry"}, currentRegistry)
+	err = cli.Get(ctx, client.ObjectKey{Namespace: registry.RegistryNamespace(), Name: "registry"}, currentRegistry)
 	if err != nil {
 		return fmt.Errorf("get registry deployment: %w", err)
 	}
@@ -150,7 +151,7 @@ func registryScale(scale int32) error {
 
 	currentRegistry.Spec.Replicas = &scale
 
-	err = cli.Update(context.TODO(), currentRegistry)
+	err = cli.Update(ctx, currentRegistry)
 	if err != nil {
 		return fmt.Errorf("update registry deployment: %w", err)
 	}

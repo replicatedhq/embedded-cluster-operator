@@ -13,7 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const registryDataMigrationCompleteSecretName = "registry-data-migration-complete"
+const RegistryDataMigrationCompleteSecretName = "registry-data-migration-complete"
 const registryDataMigrationJobName = "registry-data-migration"
 
 const RegistryMigrationStatusConditionType = "RegistryMigrationStatus"
@@ -146,7 +146,7 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, c
 // HasRegistryMigrated checks if the registry data has been migrated by looking for the 'migration complete' secret in the registry namespace
 func HasRegistryMigrated(ctx context.Context, cli client.Client) (bool, error) {
 	sec := corev1.Secret{}
-	err := cli.Get(ctx, client.ObjectKey{Namespace: registryNamespace, Name: registryDataMigrationCompleteSecretName}, &sec)
+	err := cli.Get(ctx, client.ObjectKey{Namespace: registryNamespace, Name: RegistryDataMigrationCompleteSecretName}, &sec)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return false, nil

@@ -1287,10 +1287,9 @@ func Test_updateInfraChartsFromInstall(t *testing.T) {
 			args: args{
 				in: &v1beta1.Installation{
 					Spec: v1beta1.InstallationSpec{
-						ClusterID:        "testid",
-						BinaryName:       "testbin",
-						AirGap:           true,
-						HighAvailability: true,
+						ClusterID:  "testid",
+						BinaryName: "testbin",
+						AirGap:     true,
 					},
 				},
 				clusterConfig: k0sv1beta1.ClusterConfig{},

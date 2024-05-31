@@ -19,28 +19,6 @@ import (
 
 const DEFAULT_VENDOR_CHART_ORDER = 10
 
-func getHelmValue(valuesYaml string, path string) (any, error) {
-	valuesMap := dig.Mapping{}
-	if err := yaml.Unmarshal([]byte(valuesYaml), &valuesMap); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal values: %w", err)
-	}
-
-	x, err := jp.ParseString(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse json path %q: %w", path, err)
-	}
-
-	value := x.Get(valuesMap)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get json path %q: %w", path, err)
-	}
-	if len(value) == 0 {
-		return nil, nil
-	}
-
-	return value[0], nil
-}
-
 func setHelmValue(valuesYaml string, path string, newValue interface{}) (string, error) {
 	newValuesMap := dig.Mapping{}
 	if err := yaml.Unmarshal([]byte(valuesYaml), &newValuesMap); err != nil {
@@ -180,13 +158,7 @@ func updateInfraChartsFromInstall(ctx context.Context, in *v1beta1.Installation,
 			charts[i].Values = newVals
 		}
 		if chart.Name == "docker-registry" {
-			val, err := getHelmValue(chart.Values, "s3.regionEndpoint")
-			if err != nil {
-				log.Error(err, "failed to get helm values s3.regionEndpoint", "chart", chart.Name)
-				continue
-			}
-			if val, _ := val.(string); val == "" {
-				// if the regionEndpoint is unset, this is not ha chart
+			if in == nil || !in.Spec.AirGap || !in.Spec.HighAvailability {
 				continue
 			}
 

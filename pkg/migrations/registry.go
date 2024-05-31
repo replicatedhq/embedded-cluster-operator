@@ -27,12 +27,16 @@ func registryData() error {
 			}
 		}
 	}()
+	err := registryScale(0)
+	if err != nil {
+		return fmt.Errorf("failed to scale registry to 0 replicas before uploading data: %w", err)
+	}
 
 	fmt.Printf("Connecting to s3\n")
 	// TODO connect to S3
 
 	fmt.Printf("Running registry data migration\n")
-	err := filepath.Walk("/var/lib/embedded-cluster/registry", func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk("/var/lib/embedded-cluster/registry", func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() {
 			return nil
 		}

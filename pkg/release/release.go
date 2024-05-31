@@ -40,23 +40,23 @@ func LocalVersionMetadataConfigmap(version string) types.NamespacedName {
 
 // configureRegistryTLS makes sure that the docker-registry values contains an entry for the
 // tls secret. this function should be called only if the tls secret exists.
-func configureRegistryTLS(meta *ectypes.ReleaseMetadata, ext k0sv1beta1.HelmExtensions) (k0sv1beta1.HelmExtensions, error) {
+func configureRegistryTLS(meta *ectypes.ReleaseMetadata, ext k0sv1beta1.HelmExtensions) error {
 	for i, chart := range ext.Charts {
 		if chart.Name != "docker-registry" {
 			continue
 		}
 		var values map[string]interface{}
 		if err := yaml.Unmarshal([]byte(chart.Values), &values); err != nil {
-			return ext, fmt.Errorf("failed to unmarshal registry chart values: %w", err)
+			return fmt.Errorf("failed to unmarshal registry chart values: %w", err)
 		}
 		values["tlsSecretName"] = "registry-tls"
 		newValues, err := yaml.Marshal(values)
 		if err != nil {
-			return ext, fmt.Errorf("unable to marshal new registry chart values: %w", err)
+			return fmt.Errorf("unable to marshal new registry chart values: %w", err)
 		}
 		ext.Charts[i].Values = string(newValues)
 	}
-	return ext, nil
+	return nil
 }
 
 // MetadataFor determines from where to read the metadata (from the cluster or remotely) and calls
@@ -108,20 +108,18 @@ func localMetadataFor(ctx context.Context, cli client.Client, version string) (*
 
 	registryExt, ok := meta.BuiltinConfigs["registry"]
 	if ok {
-		updated, err := configureRegistryTLS(meta, registryExt)
+		err := configureRegistryTLS(meta, registryExt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to configure registry-ha tls: %w", err)
 		}
-		meta.BuiltinConfigs["registry"] = updated
 	}
 
 	registryHAExt, ok := meta.BuiltinConfigs["registry-ha"]
 	if ok {
-		updated, err := configureRegistryTLS(meta, registryHAExt)
+		err := configureRegistryTLS(meta, registryHAExt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to configure registry tls: %w", err)
 		}
-		meta.BuiltinConfigs["registry-ha"] = updated
 	}
 
 	cache[version] = meta

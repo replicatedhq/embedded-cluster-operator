@@ -72,13 +72,6 @@ func Test_mergeHelmConfigs(t *testing.T) {
 							},
 						},
 					},
-					AirgapConfigs: k0sv1beta1.HelmExtensions{
-						Charts: []k0sv1beta1.Chart{
-							{
-								Name: "airgapchart",
-							},
-						},
-					},
 				},
 				in: v1beta1.Extensions{
 					Helm: &k0sv1beta1.HelmExtensions{

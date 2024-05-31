@@ -93,7 +93,7 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, c
 							Name:    "scale-down-registry",
 							Image:   os.Getenv("EMBEDDEDCLUSTER_IMAGE"),
 							Command: []string{"/manager"},
-							Args:    []string{`--migrate=registry-scale`},
+							Args:    []string{`--migration=registry-scale`},
 						},
 					},
 					Containers: []corev1.Container{
@@ -101,7 +101,7 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, c
 							Name:    "migrate-registry-data",
 							Image:   os.Getenv("EMBEDDEDCLUSTER_IMAGE"),
 							Command: []string{"/manager"},
-							Args:    []string{`--migrate=registry-data`},
+							Args:    []string{`--migration=registry-data`},
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "registry-data",

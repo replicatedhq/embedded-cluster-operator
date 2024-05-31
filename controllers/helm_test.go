@@ -1348,9 +1348,10 @@ func Test_updateInfraChartsFromInstall(t *testing.T) {
 			args: args{
 				in: &v1beta1.Installation{
 					Spec: v1beta1.InstallationSpec{
-						ClusterID:  "testid",
-						BinaryName: "testbin",
-						AirGap:     true,
+						ClusterID:        "testid",
+						BinaryName:       "testbin",
+						AirGap:           true,
+						HighAvailability: true,
 					},
 				},
 				charts: []k0sv1beta1.Chart{
@@ -1375,7 +1376,7 @@ func Test_updateInfraChartsFromInstall(t *testing.T) {
 				},
 				{
 					Name:   "admin-console",
-					Values: "abc: xyz\nembeddedClusterID: testid\nisAirgap: \"true\"\n",
+					Values: "abc: xyz\nembeddedClusterID: testid\nisAirgap: \"true\"\nisHA: true\n",
 				},
 				{
 					Name:   "embedded-cluster-operator",

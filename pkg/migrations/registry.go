@@ -50,7 +50,9 @@ func registryData() error {
 		return fmt.Errorf("load aws config: %w", err)
 	}
 
-	s3Client := s3.New(s3.Options{Credentials: creds, UsePathStyle: true})
+	s3Client := s3.NewFromConfig(conf, func(o *s3.Options) {
+		o.UsePathStyle = true
+	})
 	registryStr := "registry"
 	_, err = s3Client.CreateBucket(context.TODO(), &s3.CreateBucketInput{
 		Bucket: &registryStr,

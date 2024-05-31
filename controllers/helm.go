@@ -10,6 +10,7 @@ import (
 	k0sv1beta1 "github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
 	"github.com/ohler55/ojg/jp"
 	ectypes "github.com/replicatedhq/embedded-cluster-kinds/types"
+	"github.com/replicatedhq/embedded-cluster-operator/pkg/registry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/yaml"
 
@@ -17,6 +18,28 @@ import (
 )
 
 const DEFAULT_VENDOR_CHART_ORDER = 10
+
+func getHelmValue(valuesYaml string, path string) (any, error) {
+	valuesMap := dig.Mapping{}
+	if err := yaml.Unmarshal([]byte(valuesYaml), &valuesMap); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal values: %w", err)
+	}
+
+	x, err := jp.ParseString(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse json path %q: %w", path, err)
+	}
+
+	value := x.Get(valuesMap)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get json path %q: %w", path, err)
+	}
+	if len(value) == 0 {
+		return nil, nil
+	}
+
+	return value[0], nil
+}
 
 func setHelmValue(valuesYaml string, path string, newValue interface{}) (string, error) {
 	newValuesMap := dig.Mapping{}
@@ -42,7 +65,7 @@ func setHelmValue(valuesYaml string, path string, newValue interface{}) (string,
 }
 
 // merge the default helm charts and repositories (from meta.Configs) with vendor helm charts (from in.Spec.Config.Extensions.Helm)
-func mergeHelmConfigs(ctx context.Context, meta *ectypes.ReleaseMetadata, in *v1beta1.Installation) *k0sv1beta1.HelmExtensions {
+func mergeHelmConfigs(ctx context.Context, meta *ectypes.ReleaseMetadata, in *v1beta1.Installation, clusterConfig k0sv1beta1.ClusterConfig) *k0sv1beta1.HelmExtensions {
 	// merge default helm charts (from meta.Configs) with vendor helm charts (from in.Spec.Config.Extensions.Helm)
 	combinedConfigs := &k0sv1beta1.HelmExtensions{ConcurrencyLevel: 1}
 	if meta != nil {
@@ -98,7 +121,7 @@ func mergeHelmConfigs(ctx context.Context, meta *ectypes.ReleaseMetadata, in *v1
 	}
 
 	// update the infrastructure charts from the install spec
-	combinedConfigs.Charts = updateInfraChartsFromInstall(ctx, in, combinedConfigs.Charts)
+	combinedConfigs.Charts = updateInfraChartsFromInstall(ctx, in, clusterConfig, combinedConfigs.Charts)
 
 	// k0s sorts order numbers alphabetically because they're used in file names,
 	// which means double digits can be sorted before single digits (e.g. "10" comes before "5").
@@ -110,7 +133,7 @@ func mergeHelmConfigs(ctx context.Context, meta *ectypes.ReleaseMetadata, in *v1
 }
 
 // update the 'admin-console' and 'embedded-cluster-operator' charts to add cluster ID, binary name, airgap status, and HA status
-func updateInfraChartsFromInstall(ctx context.Context, in *v1beta1.Installation, charts k0sv1beta1.ChartsSettings) k0sv1beta1.ChartsSettings {
+func updateInfraChartsFromInstall(ctx context.Context, in *v1beta1.Installation, clusterConfig k0sv1beta1.ClusterConfig, charts k0sv1beta1.ChartsSettings) k0sv1beta1.ChartsSettings {
 	log := ctrl.LoggerFrom(ctx)
 
 	if in == nil {
@@ -122,19 +145,19 @@ func updateInfraChartsFromInstall(ctx context.Context, in *v1beta1.Installation,
 			// admin-console has "embeddedClusterID" and "isAirgap" as dynamic values
 			newVals, err := setHelmValue(chart.Values, "embeddedClusterID", in.Spec.ClusterID)
 			if err != nil {
-				log.Info("failed to set embeddedClusterID for %s: %v", chart.Name, err)
+				log.Error(err, "failed to set helm values embeddedClusterID", "chart", chart.Name)
 				continue
 			}
 
 			newVals, err = setHelmValue(newVals, "isAirgap", fmt.Sprintf("%t", in.Spec.AirGap))
 			if err != nil {
-				log.Info("failed to set isAirgap for %s: %v", chart.Name, err)
+				log.Error(err, "failed to set helm values isAirgap", "chart", chart.Name)
 				continue
 			}
 
 			newVals, err = setHelmValue(newVals, "isHA", in.Spec.HighAvailability)
 			if err != nil {
-				log.Info("failed to set isHA for %s: %v", chart.Name, err)
+				log.Error(err, "failed to set helm values isHA", "chart", chart.Name)
 				continue
 			}
 
@@ -144,13 +167,43 @@ func updateInfraChartsFromInstall(ctx context.Context, in *v1beta1.Installation,
 			// embedded-cluster-operator has "embeddedBinaryName" and "embeddedClusterID" as dynamic values
 			newVals, err := setHelmValue(chart.Values, "embeddedBinaryName", in.Spec.BinaryName)
 			if err != nil {
-				log.Info("failed to set embeddedBinaryName for %s: %v", err)
+				log.Error(err, "failed to set helm values embeddedBinaryName", "chart", chart.Name)
 				continue
 			}
 
 			newVals, err = setHelmValue(newVals, "embeddedClusterID", in.Spec.ClusterID)
 			if err != nil {
-				log.Info("failed to set embeddedClusterID for %s: %v", err)
+				log.Error(err, "failed to set helm values embeddedClusterID", "chart", chart.Name)
+				continue
+			}
+
+			charts[i].Values = newVals
+		}
+		if chart.Name == "docker-registry" {
+			val, err := getHelmValue(chart.Values, "s3.regionEndpoint")
+			if err != nil {
+				log.Error(err, "failed to get helm values s3.regionEndpoint", "chart", chart.Name)
+				continue
+			}
+			if val, _ := val.(string); val == "" {
+				// if the regionEndpoint is unset, this is not ha chart
+				continue
+			}
+
+			serviceCIDR := k0sv1beta1.DefaultNetwork().ServiceCIDR
+			if clusterConfig.Spec != nil && clusterConfig.Spec.Network != nil {
+				serviceCIDR = clusterConfig.Spec.Network.ServiceCIDR
+			}
+
+			seaweedfsS3Endpoint, err := registry.GetSeaweedfsS3Endpoint(serviceCIDR)
+			if err != nil {
+				log.Error(err, "failed to get seaweedfs s3 endpoint", "chart", chart.Name)
+				continue
+			}
+
+			newVals, err := setHelmValue(chart.Values, "s3.regionEndpoint", seaweedfsS3Endpoint)
+			if err != nil {
+				log.Error(err, "failed to set helm values embeddedClusterID", "chart", chart.Name)
 				continue
 			}
 

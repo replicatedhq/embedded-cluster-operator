@@ -94,27 +94,38 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, c
 							Command: []string{"sh", "-c"},
 							Args:    []string{`kubectl scale deployment registry -n ` + RegistryNamespace + ` --replicas=0`},
 						},
-						//						{
-						//							Name:    "wait-for-seaweed",
-						//							Image:   "amazon/aws-cli:latest", // TODO improve this
-						//							Command: []string{"sh", "-c"},
-						//							Args: []string{`
-						//         while ! aws s3 ls s3:// --endpoint-url=http://seaweedfs-s3.seaweedfs:8333; then
-						//           echo "waiting for seaweedfs-s3 to be ready"
-						//           sleep 5
-						//         fi
-						//         echo "seaweedfs-s3 is ready"
-						//`},
-						//							EnvFrom: []corev1.EnvFromSource{
-						//								{
-						//									SecretRef: &corev1.SecretEnvSource{
-						//										LocalObjectReference: corev1.LocalObjectReference{
-						//											Name: RegistryS3SecretName,
-						//										},
-						//									},
-						//								},
-						//							},
-						//						},
+						{
+							Name:    "wait-for-seaweed",
+							Image:   "amazon/aws-cli:latest", // TODO improve this
+							Command: []string{"sh", "-c"},
+							Args: []string{`
+						        while ! aws s3 ls --endpoint-url=http://seaweedfs-s3.seaweedfs:8333; then
+						          echo "waiting for seaweedfs-s3 to be ready"
+						          sleep 5
+						        fi
+						        echo "seaweedfs-s3 is ready"
+							`},
+							Env: []corev1.EnvVar{
+								{
+									Name: "AWS_ACCESS_KEY_ID",
+									ValueFrom: &corev1.EnvVarSource{
+										SecretKeyRef: &corev1.SecretKeySelector{
+											LocalObjectReference: corev1.LocalObjectReference{Name: RegistryS3SecretName},
+											Key:                  "s3AccessKey",
+										},
+									},
+								},
+								{
+									Name: "AWS_SECRET_ACCESS_KEY",
+									ValueFrom: &corev1.EnvVarSource{
+										SecretKeyRef: &corev1.SecretKeySelector{
+											LocalObjectReference: corev1.LocalObjectReference{Name: RegistryS3SecretName},
+											Key:                  "s3SecretKey",
+										},
+									},
+								},
+							},
+						},
 						{
 							Name:    "migrate-registry-data",
 							Image:   "amazon/aws-cli:latest", // TODO improve this
@@ -131,11 +142,22 @@ func MigrateRegistryData(ctx context.Context, in *clusterv1beta1.Installation, c
 									MountPath: "/var/lib/embedded-cluster/registry",
 								},
 							},
-							EnvFrom: []corev1.EnvFromSource{
+							Env: []corev1.EnvVar{
 								{
-									SecretRef: &corev1.SecretEnvSource{
-										LocalObjectReference: corev1.LocalObjectReference{
-											Name: RegistryS3SecretName,
+									Name: "AWS_ACCESS_KEY_ID",
+									ValueFrom: &corev1.EnvVarSource{
+										SecretKeyRef: &corev1.SecretKeySelector{
+											LocalObjectReference: corev1.LocalObjectReference{Name: RegistryS3SecretName},
+											Key:                  "s3AccessKey",
+										},
+									},
+								},
+								{
+									Name: "AWS_SECRET_ACCESS_KEY",
+									ValueFrom: &corev1.EnvVarSource{
+										SecretKeyRef: &corev1.SecretKeySelector{
+											LocalObjectReference: corev1.LocalObjectReference{Name: RegistryS3SecretName},
+											Key:                  "s3SecretKey",
 										},
 									},
 								},

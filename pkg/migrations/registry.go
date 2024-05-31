@@ -6,6 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/registry"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -33,15 +36,50 @@ func registryData() error {
 	}
 
 	fmt.Printf("Connecting to s3\n")
-	// TODO connect to S3
+	creds := credentials.NewStaticCredentialsProvider(os.Getenv("s3AccessKey"), os.Getenv("s3SecretKey"), "")
+	conf, err := config.LoadDefaultConfig(context.TODO(),
+		config.WithCredentialsProvider(creds),
+		config.WithRegion("us-east-1"),
+	)
+	if err != nil {
+		return fmt.Errorf("load aws config: %w", err)
+	}
+
+	s3Client := s3.NewFromConfig(conf)
+	registryStr := "registry"
+	_, err = s3Client.CreateBucket(context.TODO(), &s3.CreateBucketInput{
+		Bucket: &registryStr,
+	})
+	if err != nil {
+		return fmt.Errorf("create bucket: %w", err)
+	}
 
 	fmt.Printf("Running registry data migration\n")
 	err = filepath.Walk("/var/lib/embedded-cluster/registry", func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() {
 			return nil
 		}
-		// TODO upload S3 data
-		fmt.Printf("uploading %s, size %d\n", path, info.Size())
+
+		f, err := os.Open(path)
+		if err != nil {
+			return fmt.Errorf("open file: %w", err)
+		}
+		defer f.Close()
+
+		relPath, err := filepath.Rel("/var/lib/embedded-cluster/registry", path)
+		if err != nil {
+			return fmt.Errorf("get relative path: %w", err)
+		}
+
+		fmt.Printf("uploading %s, size %d\n", relPath, info.Size())
+		_, err = s3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+			Bucket: &registryStr,
+			Body:   f,
+			Key:    &relPath,
+		})
+		if err != nil {
+			return fmt.Errorf("upload object: %w", err)
+		}
 
 		return nil
 	})

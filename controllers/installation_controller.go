@@ -33,6 +33,7 @@ import (
 	k0sv1beta1 "github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
 	apcore "github.com/k0sproject/k0s/pkg/autopilot/controller/plans/core"
 	"github.com/k0sproject/version"
+	"github.com/replicatedhq/embedded-cluster-operator/pkg/openebs"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/registry"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/util"
 	batchv1 "k8s.io/api/batch/v1"
@@ -598,6 +599,21 @@ func (r *InstallationReconciler) ReconcileK0sVersion(ctx context.Context, in *v1
 	return nil
 }
 
+func (r *InstallationReconciler) ReconcileOpenebs(ctx context.Context, in *v1beta1.Installation) error {
+	log := ctrl.LoggerFrom(ctx)
+
+	err := openebs.CleanupStatefulPods(ctx, r.Client)
+	if err != nil {
+		// Conditions may be updated so we need to update the status
+		if err := r.Status().Update(ctx, in); err != nil {
+			log.Error(err, "Failed to update installation status")
+		}
+		return fmt.Errorf("failed to cleanup openebs stateful pods: %w", err)
+	}
+
+	return nil
+}
+
 // ReconcileRegistry reconciles registry components, ensuring that the necessary secrets are
 // created as well as rebalancing stateful pods when nodes are removed from the cluster.
 func (r *InstallationReconciler) ReconcileRegistry(ctx context.Context, in *v1beta1.Installation) error {
@@ -672,13 +688,13 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 		return nil
 	}
 
-	combinedConfigs := mergeHelmConfigs(ctx, meta, in)
-
 	// fetch the current clusterConfig
 	var clusterConfig k0sv1beta1.ClusterConfig
 	if err := r.Get(ctx, client.ObjectKey{Name: "k0s", Namespace: "kube-system"}, &clusterConfig); err != nil {
 		return fmt.Errorf("failed to get cluster config: %w", err)
 	}
+
+	combinedConfigs := mergeHelmConfigs(ctx, meta, in, clusterConfig)
 
 	if in.Spec.AirGap {
 		// if in airgap mode then all charts are already on the node's disk. we just need to
@@ -1066,6 +1082,11 @@ func (r *InstallationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// keeps the installation in sync with the state of the k0s upgrade.
 	if err := r.ReconcileK0sVersion(ctx, in); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to reconcile k0s version: %w", err)
+	}
+
+	// cleanup openebs stateful pods
+	if err := r.ReconcileOpenebs(ctx, in); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to reconcile openebs: %w", err)
 	}
 
 	// reconcile helm chart dependencies including secrets.

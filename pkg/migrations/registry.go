@@ -2,16 +2,15 @@ package migrations
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/registry"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -60,7 +59,7 @@ func registryData() error {
 		Bucket: &registryStr,
 	})
 	if err != nil {
-		if !errors.Is(err, &s3types.BucketAlreadyExists{}) {
+		if !strings.Contains(err.Error(), "BucketAlreadyExists") {
 			return fmt.Errorf("create bucket: %w", err)
 		}
 	}

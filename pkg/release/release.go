@@ -112,7 +112,7 @@ func localMetadataFor(ctx context.Context, cli client.Client, version string) (*
 		if err != nil {
 			return nil, fmt.Errorf("failed to configure registry-ha tls: %w", err)
 		}
-		meta.BuiltinConfigs["registry-ha"] = updated
+		meta.BuiltinConfigs["registry"] = updated
 	}
 
 	registryHAExt, ok := meta.BuiltinConfigs["registry-ha"]

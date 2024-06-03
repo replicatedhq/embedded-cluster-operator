@@ -77,7 +77,7 @@ func registryData(ctx context.Context) error {
 		}
 		defer f.Close()
 
-		relPath, err := filepath.Rel("/var/lib/embedded-cluster/registry", path)
+		relPath, err := filepath.Rel("/var/lib/embedded-cluster", path)
 		if err != nil {
 			return fmt.Errorf("get relative path: %w", err)
 		}

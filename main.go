@@ -20,7 +20,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -35,7 +34,6 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -80,10 +78,10 @@ func main() {
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
-	k8slogger := zap.New(func(o *zap.Options) {
-		o.DestWriter = io.Discard
-	})
-	log.SetLogger(k8slogger)
+	//k8slogger := zap.New(func(o *zap.Options) {
+	//	o.DestWriter = io.Discard
+	//})
+	//log.SetLogger(k8slogger)
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	if migration != "" {

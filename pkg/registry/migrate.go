@@ -149,6 +149,9 @@ func GetSeaweedChartHealth(ctx context.Context, cli client.Client) (bool, error)
 	seaChart := k0sHelmv1beta1.Chart{}
 	err := cli.Get(ctx, client.ObjectKey{Namespace: "kube-system", Name: "k0s-addon-chart-seaweedfs"}, &seaChart)
 	if err != nil {
+		if errors.IsNotFound(err) {
+			return false, nil
+		}
 		return false, fmt.Errorf("get seaweed chart: %w", err)
 	}
 

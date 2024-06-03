@@ -78,10 +78,6 @@ func main() {
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
-	//k8slogger := zap.New(func(o *zap.Options) {
-	//	o.DestWriter = io.Discard
-	//})
-	//log.SetLogger(k8slogger)
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	if migration != "" {

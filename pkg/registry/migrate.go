@@ -113,6 +113,11 @@ func HasRegistryMigrated(ctx context.Context, cli client.Client) (bool, error) {
 		return false, fmt.Errorf("get registry migration secret: %w", err)
 	}
 
+	err = maybeDeleteRegistryJob(ctx, cli)
+	if err != nil {
+		return false, fmt.Errorf("cleanup registry migration job: %w", err)
+	}
+
 	return true, nil
 }
 
@@ -177,4 +182,21 @@ func newMigrationJob(in *clusterv1beta1.Installation, cli client.Client) (batchv
 	job.ObjectMeta.Labels = k8sutil.ApplyCommonLabels(job.ObjectMeta.Labels, in, registryDataMigrationJobName)
 
 	return job, nil
+}
+
+func maybeDeleteRegistryJob(ctx context.Context, cli client.Client) error {
+	jo := batchv1.Job{}
+	err := cli.Get(ctx, client.ObjectKey{Namespace: registryNamespace, Name: registryDataMigrationJobName}, &jo)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil // the job is done, nothing to delete
+		}
+		return fmt.Errorf("get registry migration job: %w", err)
+	}
+
+	err = cli.Delete(ctx, &jo)
+	if err != nil {
+		return fmt.Errorf("delete registry migration job: %w", err)
+	}
+	return nil
 }

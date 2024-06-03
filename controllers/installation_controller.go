@@ -303,6 +303,11 @@ func (r *InstallationReconciler) CreateArtifactJobForNode(ctx context.Context, i
 		job.Spec.Template.Spec.Containers[0].Image = img
 	}
 
+	err = ctrl.SetControllerReference(in, job, r.Client.Scheme())
+	if err != nil {
+		return fmt.Errorf("failed to set controller reference: %w", err)
+	}
+
 	if err := r.Create(ctx, job); err != nil {
 		return fmt.Errorf("failed to create job: %w", err)
 	}
@@ -1130,9 +1135,9 @@ func (r *InstallationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&v1beta1.Installation{}).
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.Service{}).
+		Owns(&batchv1.Job{}).
 		Watches(&corev1.Node{}, &handler.EnqueueRequestForObject{}).
 		Watches(&apv1b2.Plan{}, &handler.EnqueueRequestForObject{}).
 		Watches(&k0shelm.Chart{}, &handler.EnqueueRequestForObject{}).
-		Watches(&batchv1.Job{}, &handler.EnqueueRequestForObject{}).
 		Complete(r)
 }

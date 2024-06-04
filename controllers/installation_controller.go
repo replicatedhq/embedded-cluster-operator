@@ -776,15 +776,15 @@ func (r *InstallationReconciler) ReconcileHAStatus(ctx context.Context, in *v1be
 
 	}
 
-	rqliteReady, err := k8sutil.GetChartHealth(ctx, r.Client, "kotsadm")
+	adminConsole, err := k8sutil.GetChartHealth(ctx, r.Client, "admin-console")
 	if err != nil {
-		return fmt.Errorf("failed to check rqlite readiness: %w", err)
+		return fmt.Errorf("failed to check admin-console readiness: %w", err)
 	}
-	if !rqliteReady {
+	if !adminConsole {
 		in.Status.SetCondition(metav1.Condition{
 			Type:               HAConditionType,
 			Status:             metav1.ConditionFalse,
-			Reason:             "KotsadmNotReady",
+			Reason:             "AdminConsoleNotReady",
 			ObservedGeneration: in.Generation,
 		})
 		return nil

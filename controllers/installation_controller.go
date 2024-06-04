@@ -773,6 +773,16 @@ func (r *InstallationReconciler) ReconcileHAStatus(ctx context.Context, in *v1be
 		return nil
 	}
 
+	if in.Status.State != v1beta1.InstallationStateInstalled {
+		in.Status.SetCondition(metav1.Condition{
+			Type:               HAConditionType,
+			Status:             metav1.ConditionFalse,
+			Reason:             "Installation Not Ready",
+			ObservedGeneration: in.Generation,
+		})
+		return nil
+	}
+
 	in.Status.SetCondition(metav1.Condition{
 		Type:               HAConditionType,
 		Status:             metav1.ConditionTrue,
@@ -1275,14 +1285,14 @@ func (r *InstallationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, fmt.Errorf("failed to pre-reconcile helm charts: %w", err)
 	}
 
-	if err := r.ReconcileHAStatus(ctx, in); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to reconcile HA status: %w", err)
-	}
-
 	// reconcile the add-ons (k0s helm extensions).
 	log.Info("Reconciling addons")
 	if err := r.ReconcileHelmCharts(ctx, in); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to reconcile helm charts: %w", err)
+	}
+
+	if err := r.ReconcileHAStatus(ctx, in); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to reconcile HA status: %w", err)
 	}
 
 	// save the installation status. nothing more to do with it.

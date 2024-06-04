@@ -21,6 +21,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"github.com/replicatedhq/embedded-cluster-operator/pkg/rqlite"
 	"os"
 	"path/filepath"
 	"sort"
@@ -58,6 +59,8 @@ import (
 // InstallationNameAnnotation is the annotation we keep in the autopilot plan so we can
 // map 1 to 1 one installation and one plan.
 const InstallationNameAnnotation = "embedded-cluster.replicated.com/installation-name"
+
+const HAConditionType = "HighAvailability"
 
 // requeueAfter is our default interval for requeueing. If nothing has changed with the
 // cluster nodes or the Installation object we will reconcile once every requeueAfter
@@ -724,6 +727,62 @@ func (r *InstallationReconciler) ReconcileRegistry(ctx context.Context, in *v1be
 	return nil
 }
 
+// ReconcileHAStatus reconciles the HA migration status condition for the installation.
+// This status is based on the HA condition being set, the Registry deployment having two running + healthy replicas,
+// and the kotsadm rqlite statefulset having three healthy replicas.
+func (r *InstallationReconciler) ReconcileHAStatus(ctx context.Context, in *v1beta1.Installation) error {
+	if in == nil {
+		return nil
+	}
+
+	if !in.Spec.HighAvailability {
+		in.Status.SetCondition(metav1.Condition{
+			Type:               HAConditionType,
+			Status:             metav1.ConditionFalse,
+			Reason:             "HA Not Enabled",
+			ObservedGeneration: in.Generation,
+		})
+		return nil
+	}
+
+	registryReady, err := registry.IsRegistryReady(ctx, r.Client)
+	if err != nil {
+		return fmt.Errorf("failed to check registry readiness: %w", err)
+	}
+	if !registryReady {
+		in.Status.SetCondition(metav1.Condition{
+			Type:               HAConditionType,
+			Status:             metav1.ConditionFalse,
+			Reason:             "Registry Not Ready",
+			ObservedGeneration: in.Generation,
+		})
+		return nil
+	}
+
+	rqliteReady, err := rqlite.IsRqliteReady(ctx, r.Client)
+	if err != nil {
+		return fmt.Errorf("failed to check rqlite readiness: %w", err)
+	}
+	if !rqliteReady {
+		in.Status.SetCondition(metav1.Condition{
+			Type:               HAConditionType,
+			Status:             metav1.ConditionFalse,
+			Reason:             "Rqlite Not Ready",
+			ObservedGeneration: in.Generation,
+		})
+		return nil
+	}
+
+	in.Status.SetCondition(metav1.Condition{
+		Type:               HAConditionType,
+		Status:             metav1.ConditionTrue,
+		Reason:             "HA Ready",
+		ObservedGeneration: in.Generation,
+	})
+
+	return nil
+}
+
 // ReconcileHelmCharts reconciles the helm charts from the Installation metadata with the clusterconfig object.
 func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1beta1.Installation) error {
 	if in.Spec.Config == nil || in.Spec.Config.Version == "" {
@@ -1214,6 +1273,10 @@ func (r *InstallationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// reconcile helm chart dependencies including secrets.
 	if err := r.ReconcileRegistry(ctx, in); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to pre-reconcile helm charts: %w", err)
+	}
+
+	if err := r.ReconcileHAStatus(ctx, in); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to reconcile HA status: %w", err)
 	}
 
 	// reconcile the add-ons (k0s helm extensions).

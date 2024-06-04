@@ -739,7 +739,7 @@ func (r *InstallationReconciler) ReconcileHAStatus(ctx context.Context, in *v1be
 		in.Status.SetCondition(metav1.Condition{
 			Type:               HAConditionType,
 			Status:             metav1.ConditionFalse,
-			Reason:             "HA Not Enabled",
+			Reason:             "HANotEnabled",
 			ObservedGeneration: in.Generation,
 		})
 		return nil
@@ -754,7 +754,7 @@ func (r *InstallationReconciler) ReconcileHAStatus(ctx context.Context, in *v1be
 			in.Status.SetCondition(metav1.Condition{
 				Type:               HAConditionType,
 				Status:             metav1.ConditionFalse,
-				Reason:             "Registry Not Ready",
+				Reason:             "RegistryNotReady",
 				ObservedGeneration: in.Generation,
 			})
 			return nil
@@ -768,7 +768,7 @@ func (r *InstallationReconciler) ReconcileHAStatus(ctx context.Context, in *v1be
 			in.Status.SetCondition(metav1.Condition{
 				Type:               HAConditionType,
 				Status:             metav1.ConditionFalse,
-				Reason:             "SeaweedFS Not Ready",
+				Reason:             "SeaweedFSNotReady",
 				ObservedGeneration: in.Generation,
 			})
 			return nil
@@ -784,7 +784,7 @@ func (r *InstallationReconciler) ReconcileHAStatus(ctx context.Context, in *v1be
 		in.Status.SetCondition(metav1.Condition{
 			Type:               HAConditionType,
 			Status:             metav1.ConditionFalse,
-			Reason:             "Kotsadm Not Ready",
+			Reason:             "KotsadmNotReady",
 			ObservedGeneration: in.Generation,
 		})
 		return nil
@@ -794,7 +794,7 @@ func (r *InstallationReconciler) ReconcileHAStatus(ctx context.Context, in *v1be
 		in.Status.SetCondition(metav1.Condition{
 			Type:               HAConditionType,
 			Status:             metav1.ConditionFalse,
-			Reason:             "Installation Not Ready",
+			Reason:             "InstallationNotReady",
 			ObservedGeneration: in.Generation,
 		})
 		return nil
@@ -803,7 +803,7 @@ func (r *InstallationReconciler) ReconcileHAStatus(ctx context.Context, in *v1be
 	in.Status.SetCondition(metav1.Condition{
 		Type:               HAConditionType,
 		Status:             metav1.ConditionTrue,
-		Reason:             "HA Ready",
+		Reason:             "HAReady",
 		ObservedGeneration: in.Generation,
 	})
 

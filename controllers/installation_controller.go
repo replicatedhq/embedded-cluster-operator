@@ -745,18 +745,35 @@ func (r *InstallationReconciler) ReconcileHAStatus(ctx context.Context, in *v1be
 		return nil
 	}
 
-	registryReady, err := k8sutil.GetChartHealth(ctx, r.Client, "registry")
-	if err != nil {
-		return fmt.Errorf("failed to check registry readiness: %w", err)
-	}
-	if !registryReady {
-		in.Status.SetCondition(metav1.Condition{
-			Type:               HAConditionType,
-			Status:             metav1.ConditionFalse,
-			Reason:             "Registry Not Ready",
-			ObservedGeneration: in.Generation,
-		})
-		return nil
+	if in.Spec.AirGap {
+		registryReady, err := k8sutil.GetChartHealth(ctx, r.Client, "registry")
+		if err != nil {
+			return fmt.Errorf("failed to check registry readiness: %w", err)
+		}
+		if !registryReady {
+			in.Status.SetCondition(metav1.Condition{
+				Type:               HAConditionType,
+				Status:             metav1.ConditionFalse,
+				Reason:             "Registry Not Ready",
+				ObservedGeneration: in.Generation,
+			})
+			return nil
+		}
+
+		seaweedReady, err := k8sutil.GetChartHealth(ctx, r.Client, "seaweedfs")
+		if err != nil {
+			return fmt.Errorf("failed to check seaweedfs readiness: %w", err)
+		}
+		if !seaweedReady {
+			in.Status.SetCondition(metav1.Condition{
+				Type:               HAConditionType,
+				Status:             metav1.ConditionFalse,
+				Reason:             "SeaweedFS Not Ready",
+				ObservedGeneration: in.Generation,
+			})
+			return nil
+		}
+
 	}
 
 	rqliteReady, err := k8sutil.GetChartHealth(ctx, r.Client, "kotsadm")

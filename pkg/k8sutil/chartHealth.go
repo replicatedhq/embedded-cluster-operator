@@ -20,7 +20,7 @@ func GetChartHealth(ctx context.Context, cli client.Client, chartName string) (b
 		return false, fmt.Errorf("get %s chart: %w", chartName, err)
 	}
 
-	// check if the seaweed chart is deployed and healthy
+	// check if the chart is deployed and healthy
 	// if it is, return true
 	if ch.Status.Version == "" {
 		return false, nil
@@ -32,6 +32,9 @@ func GetChartHealth(ctx context.Context, cli client.Client, chartName string) (b
 		return false, nil
 	}
 	if ch.Status.ValuesHash == "" {
+		return false, nil
+	}
+	if ch.Spec.HashValues() != ch.Status.ValuesHash {
 		return false, nil
 	}
 

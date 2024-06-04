@@ -33,10 +33,6 @@ import (
 	k0sv1beta1 "github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
 	apcore "github.com/k0sproject/k0s/pkg/autopilot/controller/plans/core"
 	"github.com/k0sproject/version"
-	"github.com/replicatedhq/embedded-cluster-operator/pkg/openebs"
-	"github.com/replicatedhq/embedded-cluster-operator/pkg/registry"
-	"github.com/replicatedhq/embedded-cluster-operator/pkg/rqlite"
-	"github.com/replicatedhq/embedded-cluster-operator/pkg/util"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -52,8 +48,12 @@ import (
 	"github.com/replicatedhq/embedded-cluster-kinds/apis/v1beta1"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/artifacts"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/autopilot"
+	"github.com/replicatedhq/embedded-cluster-operator/pkg/k8sutil"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/metrics"
+	"github.com/replicatedhq/embedded-cluster-operator/pkg/openebs"
+	"github.com/replicatedhq/embedded-cluster-operator/pkg/registry"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/release"
+	"github.com/replicatedhq/embedded-cluster-operator/pkg/util"
 )
 
 // InstallationNameAnnotation is the annotation we keep in the autopilot plan so we can
@@ -745,7 +745,7 @@ func (r *InstallationReconciler) ReconcileHAStatus(ctx context.Context, in *v1be
 		return nil
 	}
 
-	registryReady, err := registry.IsRegistryReady(ctx, r.Client)
+	registryReady, err := k8sutil.GetChartHealth(ctx, r.Client, "registry")
 	if err != nil {
 		return fmt.Errorf("failed to check registry readiness: %w", err)
 	}
@@ -759,7 +759,7 @@ func (r *InstallationReconciler) ReconcileHAStatus(ctx context.Context, in *v1be
 		return nil
 	}
 
-	rqliteReady, err := rqlite.IsRqliteReady(ctx, r.Client)
+	rqliteReady, err := k8sutil.GetChartHealth(ctx, r.Client, "kotsadm")
 	if err != nil {
 		return fmt.Errorf("failed to check rqlite readiness: %w", err)
 	}
@@ -767,7 +767,7 @@ func (r *InstallationReconciler) ReconcileHAStatus(ctx context.Context, in *v1be
 		in.Status.SetCondition(metav1.Condition{
 			Type:               HAConditionType,
 			Status:             metav1.ConditionFalse,
-			Reason:             "Rqlite Not Ready",
+			Reason:             "Kotsadm Not Ready",
 			ObservedGeneration: in.Generation,
 		})
 		return nil

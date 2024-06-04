@@ -746,9 +746,9 @@ func (r *InstallationReconciler) ReconcileHAStatus(ctx context.Context, in *v1be
 	}
 
 	if in.Spec.AirGap {
-		registryReady, err := k8sutil.GetChartHealth(ctx, r.Client, "registry")
+		registryReady, err := k8sutil.GetChartHealth(ctx, r.Client, "docker-registry")
 		if err != nil {
-			return fmt.Errorf("failed to check registry readiness: %w", err)
+			return fmt.Errorf("failed to check docker-registry readiness: %w", err)
 		}
 		if !registryReady {
 			in.Status.SetCondition(metav1.Condition{

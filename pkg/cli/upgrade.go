@@ -19,6 +19,8 @@ const (
 	DefaultInstallationSecretKey       = "installation.yaml"
 )
 
+// UpgradeCmd returns a cobra command for upgrading the embedded cluster operator.
+// It is called by KOTS admin console to upgrade the embedded cluster operator and installation.
 func UpgradeCmd() *cobra.Command {
 	var secretName, secretNamespace, secretKey string
 

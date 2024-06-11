@@ -8,25 +8,30 @@ import (
 )
 
 func MigrateCmd() *cobra.Command {
-	var migration string
-
 	cmd := &cobra.Command{
-		Use:          "migrate",
-		Short:        "Run the specified migration",
+		Use:   "migrate",
+		Short: "Run the specified migration",
+	}
+
+	cmd.AddCommand(
+		MigrateRegistryDataCmd(),
+	)
+
+	return cmd
+}
+
+func MigrateRegistryDataCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:          "registry-data",
+		Short:        "Run the registry-data migration",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			err := migrations.Run(cmd.Context(), migration)
+			err := migrations.RegistryData(cmd.Context())
 			if err != nil {
-				return fmt.Errorf("migration %q failed: %w", migration, err)
+				return fmt.Errorf("migration failed: %w", err)
 			}
 			return nil
 		},
-	}
-
-	cmd.Flags().StringVar(&migration, "migration", "", "The migration to run")
-	err := cmd.MarkFlagRequired("migration")
-	if err != nil {
-		panic(err)
 	}
 
 	return cmd

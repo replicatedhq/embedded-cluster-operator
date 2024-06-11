@@ -46,7 +46,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 
 	"github.com/replicatedhq/embedded-cluster-kinds/apis/v1beta1"
-	clusterv1beta1 "github.com/replicatedhq/embedded-cluster-kinds/apis/v1beta1"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/artifacts"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/autopilot"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/k8sutil"
@@ -1038,7 +1037,7 @@ func (r *InstallationReconciler) CreateAirgapPlanCommand(ctx context.Context, in
 }
 
 // StartAutopilotUpgrade creates an autopilot plan to upgrade to version specified in spec.config.version.
-func (r *InstallationReconciler) StartAutopilotUpgrade(ctx context.Context, in *clusterv1beta1.Installation) error {
+func (r *InstallationReconciler) StartAutopilotUpgrade(ctx context.Context, in *v1beta1.Installation) error {
 	targets, err := r.DetermineUpgradeTargets(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to determine upgrade targets: %w", err)
@@ -1093,7 +1092,7 @@ func (r *InstallationReconciler) StartAutopilotUpgrade(ctx context.Context, in *
 	// the installation state to 'Installed' and return. no extra autopilot plan creation
 	// is necessary at this stage.
 	if len(commands) == 0 {
-		in.Status.SetState(clusterv1beta1.InstallationStateKubernetesInstalled, "", nil)
+		in.Status.SetState(v1beta1.InstallationStateKubernetesInstalled, "", nil)
 		return nil
 	}
 
@@ -1113,7 +1112,7 @@ func (r *InstallationReconciler) StartAutopilotUpgrade(ctx context.Context, in *
 	if err := r.Create(ctx, &plan); err != nil {
 		return fmt.Errorf("failed to create upgrade plan: %w", err)
 	}
-	in.Status.SetState(clusterv1beta1.InstallationStateEnqueued, "", nil)
+	in.Status.SetState(v1beta1.InstallationStateEnqueued, "", nil)
 	return nil
 }
 
@@ -1363,7 +1362,7 @@ func (r *InstallationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return ctrl.Result{RequeueAfter: requeueAfter}, nil
 }
 
-func (r *InstallationReconciler) needsUpgrade(ctx context.Context, in *clusterv1beta1.Installation) bool {
+func (r *InstallationReconciler) needsUpgrade(ctx context.Context, in *v1beta1.Installation) bool {
 	curstr := strings.TrimPrefix(os.Getenv("EMBEDDEDCLUSTER_VERSION"), "v")
 	desstr := strings.TrimPrefix(in.Spec.Config.Version, "v")
 	return curstr != desstr

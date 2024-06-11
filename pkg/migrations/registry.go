@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/replicatedhq/embedded-cluster-operator/pkg/k8sutil"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/registry"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -99,7 +100,7 @@ func registryData(ctx context.Context) error {
 	}
 
 	fmt.Printf("Creating registry data migration secret\n")
-	cli, err := kubeClient()
+	cli, err := k8sutil.KubeClient()
 	if err != nil {
 		return fmt.Errorf("unable to create kubernetes client: %w", err)
 	}
@@ -134,7 +135,7 @@ func registryScale(ctx context.Context, scale int32) error {
 		return fmt.Errorf("invalid scale: %d", scale)
 	}
 
-	cli, err := kubeClient()
+	cli, err := k8sutil.KubeClient()
 	if err != nil {
 		return fmt.Errorf("unable to create kubernetes client: %w", err)
 	}

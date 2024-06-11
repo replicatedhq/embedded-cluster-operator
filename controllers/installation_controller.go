@@ -1075,10 +1075,13 @@ func (r *InstallationReconciler) StartUpgrade(ctx context.Context, in *v1beta1.I
 		commands = append(commands, *command)
 	}
 
-	// if the embedded cluster version has changed we create an upgrade command.
-	curstr := strings.TrimPrefix(os.Getenv("EMBEDDEDCLUSTER_VERSION"), "v")
-	desstr := strings.TrimPrefix(in.Spec.Config.Version, "v")
-	if curstr != desstr {
+	// if the kubernetes version has changed we create an upgrade command.
+	serverVersion, err := r.Discovery.ServerVersion()
+	if err != nil {
+		return fmt.Errorf("failed to get server version: %w", err)
+	}
+	// TODO(upgrade): what if there is already a plan in progress?
+	if meta.Versions["Kubernetes"] != serverVersion.GitVersion {
 		commands = append(commands, apv1b2.PlanCommand{
 			K0sUpdate: &apv1b2.PlanCommandK0sUpdate{
 				Version: meta.Versions["Kubernetes"],
@@ -1259,6 +1262,10 @@ func (r *InstallationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 	in := r.CoalesceInstallations(ctx, items)
+
+	// if the embedded cluster version has changed we need to run the cli upgrade command with the
+	// new binary version
+	r.maybeSelfUpgrade(ctx, in)
 
 	// if this cluster has no id we bail out immediately.
 	if in.Spec.ClusterID == "" {

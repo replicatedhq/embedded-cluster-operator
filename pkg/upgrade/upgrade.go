@@ -107,17 +107,14 @@ func getCurrentInstallation(ctx context.Context, cli client.Client) (*v1beta1.In
 	if err := cli.List(ctx, &installs); err != nil {
 		return nil, fmt.Errorf("list installations: %w", err)
 	}
-	var items []v1beta1.Installation
-	for _, in := range installs.Items {
-		if in.Status.State != v1beta1.InstallationStateObsolete {
-			items = append(items, in)
-		}
-	}
-	if len(items) == 0 {
-		return nil, fmt.Errorf("no active installations found")
-	}
+	items := installs.Items
 	sort.SliceStable(items, func(i, j int) bool {
 		return items[j].Name < items[i].Name
 	})
-	return &items[0], nil
+	for _, in := range installs.Items {
+		if in.Status.State != v1beta1.InstallationStateObsolete {
+			return &in, nil
+		}
+	}
+	return nil, fmt.Errorf("no active installations found")
 }

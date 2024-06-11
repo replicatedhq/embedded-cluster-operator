@@ -19,10 +19,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// registryData copies data from the disk (/var/lib/embedded-cluster/registry) to the seaweedfs s3 store.
-// if it fails, it will scale the registry deployment back to 1.
-// if it succeeds, it will create a secret used to indicate success to the operator.
-func registryData(ctx context.Context) error {
+// RegistryData runs a migration that copies data from the disk (/var/lib/embedded-cluster/registry)
+// to the seaweedfs s3 store. If it fails, it will scale the registry deployment back to 1. If it
+// succeeds, it will create a secret used to indicate success to the operator.
+func RegistryData(ctx context.Context) error {
 	// if the migration fails, we need to scale the registry back to 1
 	success := false
 	defer func() {

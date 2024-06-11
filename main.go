@@ -26,7 +26,7 @@ import (
 func main() {
 	err := cli.RootCmd().Execute()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, "ERROR:", err)
 		os.Exit(1)
 	}
 }

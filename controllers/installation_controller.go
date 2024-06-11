@@ -541,6 +541,129 @@ func (r *InstallationReconciler) HasOnlyOneInstallation(ctx context.Context) (bo
 	return len(ins) == 1, nil
 }
 
+// ReconcileK0sVersion reconciles the k0s version in the Installation object status. If the
+// Installation spec.config points to a different version we start an upgrade Plan. If an
+// upgrade plan already exists we make sure the installation status is updated with the
+// latest plan status.
+func (r *InstallationReconciler) ReconcileK0sVersion(ctx context.Context, in *v1beta1.Installation) error {
+	// starts by checking if this is the unique installation object in the cluster. if
+	// this is true then we don't need to sync anything as this is part of the initial
+	// cluster installation.
+	uniqinst, err := r.HasOnlyOneInstallation(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to find if there are multiple installations: %w", err)
+	}
+
+	// if the installation has no desired version then there isn't much we can do other
+	// than flagging as installed. if there is also only one installation object in the
+	// cluster then there is no upgrade to be executed, just set it to Installed and
+	// move on.
+	if in.Spec.Config == nil || in.Spec.Config.Version == "" || uniqinst {
+		in.Status.SetState(v1beta1.InstallationStateKubernetesInstalled, "", nil)
+		return nil
+	}
+
+	// in airgap installation the first thing we need to do is to ensure that the embedded
+	// cluster version metadata is available inside the cluster. we can't use the internet
+	// to fetch it directly from our remote servers.
+	if in.Spec.AirGap {
+		if err := r.CopyVersionMetadataToCluster(ctx, in); err != nil {
+			return fmt.Errorf("failed to copy version metadata to cluster: %w", err)
+		}
+	}
+
+	// fetch the metadata for the desired embedded cluster version.
+	meta, err := release.MetadataFor(ctx, in, r.Client)
+	if err != nil {
+		in.Status.SetState(v1beta1.InstallationStateFailed, err.Error(), nil)
+		return nil
+	}
+
+	// find out the kubernetes version we are currently running so we can compare with
+	// the desired kubernetes version. we don't want anyone trying to do a downgrade.
+	vinfo, err := r.Discovery.ServerVersion()
+	if err != nil {
+		return fmt.Errorf("failed to get server version: %w", err)
+	}
+	runningVersion := vinfo.GitVersion
+	running, err := version.NewVersion(runningVersion)
+	if err != nil {
+		reason := fmt.Sprintf("Invalid running version %s", runningVersion)
+		in.Status.SetState(v1beta1.InstallationStateFailed, reason, nil)
+		return nil
+	}
+
+	// if we have installed the cluster with a k0s version like v1.29.1+k0s.1 then
+	// the kubernetes server version reported back is v1.29.1+k0s. i.e. the .1 is
+	// not part of the kubernetes version, it is the k0s version. we trim it down
+	// so we can compare kube with kube version.
+	desiredVersion := meta.Versions["Kubernetes"]
+	desired, err := k8sServerVersionFromK0sVersion(desiredVersion)
+	if err != nil {
+		reason := fmt.Sprintf("Invalid desired version %s", desiredVersion)
+		in.Status.SetState(v1beta1.InstallationStateFailed, reason, nil)
+		return nil
+	}
+
+	// stop here if someone is trying a downgrade. we do not support this, flag the
+	// installation accordingly and returns.
+	if running.GreaterThan(desired) {
+		in.Status.SetState(v1beta1.InstallationStateFailed, "Downgrades not supported", nil)
+		return nil
+	}
+
+	if in.Spec.AirGap {
+		// in airgap installations let's make sure all assets have been copied to nodes.
+		// this may take some time so we only move forward when 'ready'.
+		if ready, err := r.CopyArtifactsToNodes(ctx, in); err != nil {
+			return fmt.Errorf("failed to copy artifacts to nodes: %w", err)
+		} else if !ready {
+			return nil
+		}
+	}
+
+	var plan apv1b2.Plan
+	okey := client.ObjectKey{Name: "autopilot"}
+	if err := r.Get(ctx, okey, &plan); err != nil && !errors.IsNotFound(err) {
+		return fmt.Errorf("failed to get upgrade plan: %w", err)
+	} else if errors.IsNotFound(err) {
+		// there is no autopilot plan in the cluster so we are free to
+		// start our own plan. here we link the plan to the installation
+		// by its name.
+		if err := r.StartAutopilotUpgrade(ctx, in); err != nil {
+			return fmt.Errorf("failed to start upgrade: %w", err)
+		}
+		return nil
+	}
+
+	// if we have created this plan we just found for the installation we are
+	// reconciling we set the installation state according to the plan state.
+	// we check both the plan id and an annotation inside the plan. the usage
+	// of the plan id is deprecated in favour of the annotation.
+	annotation := plan.Annotations[InstallationNameAnnotation]
+	if annotation == in.Name || plan.Spec.ID == in.Name {
+		r.SetStateBasedOnPlan(in, plan)
+		return nil
+	}
+
+	// this is most likely a plan that has been created by a previous installation
+	// object, we can't move on until this one finishes. this can happen if someone
+	// issues multiple upgrade requests at the same time.
+	if !autopilot.HasThePlanEnded(plan) {
+		reason := fmt.Sprintf("Another upgrade is in progress (%s)", plan.Spec.ID)
+		in.Status.SetState(v1beta1.InstallationStateWaiting, reason, nil)
+		return nil
+	}
+
+	// it seems like the plan previously created by other installation object
+	// has been finished, we can delete it. this will trigger a new reconcile
+	// this time without the plan (i.e. we will be able to create our own plan).
+	if err := r.Delete(ctx, &plan); err != nil {
+		return fmt.Errorf("failed to delete previous upgrade plan: %w", err)
+	}
+	return nil
+}
+
 func (r *InstallationReconciler) ReconcileOpenebs(ctx context.Context, in *v1beta1.Installation) error {
 	log := ctrl.LoggerFrom(ctx)
 
@@ -912,129 +1035,6 @@ func (r *InstallationReconciler) CreateAirgapPlanCommand(ctx context.Context, in
 			},
 		},
 	}, nil
-}
-
-// ReconcileK0sVersion reconciles the k0s version in the Installation object status. If the
-// Installation spec.config points to a different version we start an upgrade Plan. If an
-// upgrade plan already exists we make sure the installation status is updated with the
-// latest plan status.
-func (r *InstallationReconciler) ReconcileK0sVersion(ctx context.Context, in *v1beta1.Installation) error {
-	// starts by checking if this is the unique installation object in the cluster. if
-	// this is true then we don't need to sync anything as this is part of the initial
-	// cluster installation.
-	uniqinst, err := r.HasOnlyOneInstallation(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to find if there are multiple installations: %w", err)
-	}
-
-	// if the installation has no desired version then there isn't much we can do other
-	// than flagging as installed. if there is also only one installation object in the
-	// cluster then there is no upgrade to be executed, just set it to Installed and
-	// move on.
-	if in.Spec.Config == nil || in.Spec.Config.Version == "" || uniqinst {
-		in.Status.SetState(v1beta1.InstallationStateKubernetesInstalled, "", nil)
-		return nil
-	}
-
-	// in airgap installation the first thing we need to do is to ensure that the embedded
-	// cluster version metadata is available inside the cluster. we can't use the internet
-	// to fetch it directly from our remote servers.
-	if in.Spec.AirGap {
-		if err := r.CopyVersionMetadataToCluster(ctx, in); err != nil {
-			return fmt.Errorf("failed to copy version metadata to cluster: %w", err)
-		}
-	}
-
-	// fetch the metadata for the desired embedded cluster version.
-	meta, err := release.MetadataFor(ctx, in, r.Client)
-	if err != nil {
-		in.Status.SetState(v1beta1.InstallationStateFailed, err.Error(), nil)
-		return nil
-	}
-
-	// find out the kubernetes version we are currently running so we can compare with
-	// the desired kubernetes version. we don't want anyone trying to do a downgrade.
-	vinfo, err := r.Discovery.ServerVersion()
-	if err != nil {
-		return fmt.Errorf("failed to get server version: %w", err)
-	}
-	runningVersion := vinfo.GitVersion
-	running, err := version.NewVersion(runningVersion)
-	if err != nil {
-		reason := fmt.Sprintf("Invalid running version %s", runningVersion)
-		in.Status.SetState(v1beta1.InstallationStateFailed, reason, nil)
-		return nil
-	}
-
-	// if we have installed the cluster with a k0s version like v1.29.1+k0s.1 then
-	// the kubernetes server version reported back is v1.29.1+k0s. i.e. the .1 is
-	// not part of the kubernetes version, it is the k0s version. we trim it down
-	// so we can compare kube with kube version.
-	desiredVersion := meta.Versions["Kubernetes"]
-	desired, err := k8sServerVersionFromK0sVersion(desiredVersion)
-	if err != nil {
-		reason := fmt.Sprintf("Invalid desired version %s", desiredVersion)
-		in.Status.SetState(v1beta1.InstallationStateFailed, reason, nil)
-		return nil
-	}
-
-	// stop here if someone is trying a downgrade. we do not support this, flag the
-	// installation accordingly and returns.
-	if running.GreaterThan(desired) {
-		in.Status.SetState(v1beta1.InstallationStateFailed, "Downgrades not supported", nil)
-		return nil
-	}
-
-	if in.Spec.AirGap {
-		// in airgap installations let's make sure all assets have been copied to nodes.
-		// this may take some time so we only move forward when 'ready'.
-		if ready, err := r.CopyArtifactsToNodes(ctx, in); err != nil {
-			return fmt.Errorf("failed to copy artifacts to nodes: %w", err)
-		} else if !ready {
-			return nil
-		}
-	}
-
-	var plan apv1b2.Plan
-	okey := client.ObjectKey{Name: "autopilot"}
-	if err := r.Get(ctx, okey, &plan); err != nil && !errors.IsNotFound(err) {
-		return fmt.Errorf("failed to get upgrade plan: %w", err)
-	} else if errors.IsNotFound(err) {
-		// there is no autopilot plan in the cluster so we are free to
-		// start our own plan. here we link the plan to the installation
-		// by its name.
-		if err := r.StartAutopilotUpgrade(ctx, in); err != nil {
-			return fmt.Errorf("failed to start upgrade: %w", err)
-		}
-		return nil
-	}
-
-	// if we have created this plan we just found for the installation we are
-	// reconciling we set the installation state according to the plan state.
-	// we check both the plan id and an annotation inside the plan. the usage
-	// of the plan id is deprecated in favour of the annotation.
-	annotation := plan.Annotations[InstallationNameAnnotation]
-	if annotation == in.Name || plan.Spec.ID == in.Name {
-		r.SetStateBasedOnPlan(in, plan)
-		return nil
-	}
-
-	// this is most likely a plan that has been created by a previous installation
-	// object, we can't move on until this one finishes. this can happen if someone
-	// issues multiple upgrade requests at the same time.
-	if !autopilot.HasThePlanEnded(plan) {
-		reason := fmt.Sprintf("Another upgrade is in progress (%s)", plan.Spec.ID)
-		in.Status.SetState(v1beta1.InstallationStateWaiting, reason, nil)
-		return nil
-	}
-
-	// it seems like the plan previously created by other installation object
-	// has been finished, we can delete it. this will trigger a new reconcile
-	// this time without the plan (i.e. we will be able to create our own plan).
-	if err := r.Delete(ctx, &plan); err != nil {
-		return fmt.Errorf("failed to delete previous upgrade plan: %w", err)
-	}
-	return nil
 }
 
 // StartAutopilotUpgrade creates an autopilot plan to upgrade to version specified in spec.config.version.

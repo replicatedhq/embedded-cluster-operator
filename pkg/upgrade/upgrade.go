@@ -4,30 +4,62 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sort"
 
 	jsonpatch "github.com/evanphx/json-patch"
 	k0sv1beta1 "github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
-	"github.com/replicatedhq/embedded-cluster-kinds/apis/v1beta1"
 	clusterv1beta1 "github.com/replicatedhq/embedded-cluster-kinds/apis/v1beta1"
 	ectypes "github.com/replicatedhq/embedded-cluster-kinds/types"
+	"github.com/replicatedhq/embedded-cluster-operator/pkg/k8sutil"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/release"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
-	chartName              = "embedded-cluster-operator"
+	operatorChartName      = "embedded-cluster-operator"
 	clusterConfigName      = "k0s"
 	clusterConfigNamespace = "kube-system"
 )
 
-func Upgrade(ctx context.Context, cli client.Client) error {
-	in, err := getCurrentInstallation(ctx, cli)
+func Upgrade(ctx context.Context, cli client.Client, in *clusterv1beta1.Installation) error {
+	err := applyOperatorChart(ctx, cli, in)
 	if err != nil {
-		return fmt.Errorf("get current installation: %w", err)
+		return fmt.Errorf("apply operator chart: %w", err)
 	}
 
+	// do not apply the installation if the operator chart is not up-to-date and thus the crd is
+	// not up-to-date
+
+	err = applyInstallation(ctx, cli, in)
+	if err != nil {
+		return fmt.Errorf("apply installation: %w", err)
+	}
+
+	return nil
+}
+
+func applyInstallation(ctx context.Context, cli client.Client, in *clusterv1beta1.Installation) error {
+	err := cli.Get(ctx, types.NamespacedName{Name: in.GetName(), Namespace: in.GetNamespace()}, &clusterv1beta1.Installation{})
+	if err == nil {
+		return nil
+	} else if !k8serrors.IsNotFound(err) {
+		return fmt.Errorf("get installation: %w", err)
+	}
+
+	fmt.Println("Creating installation...")
+
+	err = cli.Create(ctx, in)
+	if err != nil {
+		return fmt.Errorf("create installation: %w", err)
+	}
+
+	fmt.Println("Installation created")
+
+	return nil
+}
+
+func applyOperatorChart(ctx context.Context, cli client.Client, in *clusterv1beta1.Installation) error {
 	metadata, err := release.MetadataFor(ctx, in, cli)
 	if err != nil {
 		return fmt.Errorf("get release metadata: %w", err)
@@ -48,15 +80,42 @@ func Upgrade(ctx context.Context, cli client.Client) error {
 	// patch the cluster config, but this command is run from an ephemeral binary in the pod, and
 	// when the cluster is upgraded it may no longer be available.
 
-	err = patchClusterConfig(ctx, cli, clusterConfig, operatorChart)
+	err = patchClusterConfigOperatorChart(ctx, cli, clusterConfig, operatorChart)
 	if err != nil {
-		return fmt.Errorf("patch clusterconfig: %w", err)
+		return fmt.Errorf("patch clusterconfig with operator chart: %w", err)
 	}
+
+	fmt.Println("Waiting for operator chart to be up-to-date...")
+
+	err = waitForOperatorChart(ctx, cli, operatorChart.Version)
+	if err != nil {
+		return fmt.Errorf("wait for operator chart: %w", err)
+	}
+
+	fmt.Println("Operator chart is up-to-date")
 
 	return nil
 }
 
-func patchClusterConfig(ctx context.Context, cli client.Client, clusterConfig *k0sv1beta1.ClusterConfig, operatorChart k0sv1beta1.Chart) error {
+func waitForOperatorChart(ctx context.Context, cli client.Client, version string) error {
+	for {
+		err := ctx.Err()
+		if err != nil {
+			return err
+		}
+
+		ready, err := k8sutil.GetChartHealthVersion(ctx, cli, operatorChartName, version)
+		if err != nil {
+			return fmt.Errorf("get chart health: %w", err)
+		}
+
+		if ready {
+			return nil
+		}
+	}
+}
+
+func patchClusterConfigOperatorChart(ctx context.Context, cli client.Client, clusterConfig *k0sv1beta1.ClusterConfig, operatorChart k0sv1beta1.Chart) error {
 	desired := setClusterConfigOperatorChart(clusterConfig, operatorChart)
 
 	original, err := json.MarshalIndent(clusterConfig, "", "  ")
@@ -72,6 +131,11 @@ func patchClusterConfig(ctx context.Context, cli client.Client, clusterConfig *k
 	patchData, err := jsonpatch.CreateMergePatch(original, modified)
 	if err != nil {
 		return fmt.Errorf("create json merge patch: %w", err)
+	}
+
+	if string(patchData) == "{}" {
+		fmt.Println("K0s cluster config already patched")
+		return nil
 	}
 
 	fmt.Printf("Patching K0s cluster config with merge patch: %s\n", string(patchData))
@@ -99,7 +163,7 @@ func setClusterConfigOperatorChart(clusterConfig *k0sv1beta1.ClusterConfig, oper
 		desired.Spec.Extensions.Helm = &k0sv1beta1.HelmExtensions{}
 	}
 	for i, chart := range desired.Spec.Extensions.Helm.Charts {
-		if chart.Name == operatorChart.Name {
+		if chart.Name == operatorChartName {
 			desired.Spec.Extensions.Helm.Charts[i] = operatorChart
 			return desired
 		}
@@ -119,26 +183,9 @@ func getExistingClusterConfig(ctx context.Context, cli client.Client) (*k0sv1bet
 
 func getOperatorChartFromMetadata(metadata *ectypes.ReleaseMetadata) (k0sv1beta1.Chart, error) {
 	for _, chart := range metadata.Configs.Charts {
-		if chart.Name == chartName {
+		if chart.Name == operatorChartName {
 			return chart, nil
 		}
 	}
 	return k0sv1beta1.Chart{}, fmt.Errorf("chart not found")
-}
-
-func getCurrentInstallation(ctx context.Context, cli client.Client) (*v1beta1.Installation, error) {
-	var installs clusterv1beta1.InstallationList
-	if err := cli.List(ctx, &installs); err != nil {
-		return nil, fmt.Errorf("list installations: %w", err)
-	}
-	items := installs.Items
-	sort.SliceStable(items, func(i, j int) bool {
-		return items[j].Name < items[i].Name
-	})
-	for _, in := range installs.Items {
-		if in.Status.State != v1beta1.InstallationStateObsolete {
-			return &in, nil
-		}
-	}
-	return nil, fmt.Errorf("no active installations found")
 }

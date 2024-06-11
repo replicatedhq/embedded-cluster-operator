@@ -6,7 +6,6 @@ import (
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/k8sutil"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/upgrade"
 	"github.com/spf13/cobra"
-	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 func UpgradeCmd() *cobra.Command {
@@ -15,9 +14,7 @@ func UpgradeCmd() *cobra.Command {
 		Short:        "Upgrade the embedded cluster operator",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			log := ctrl.LoggerFrom(cmd.Context())
-
-			log.Info("Upgrade command started")
+			fmt.Println("Upgrade command started")
 
 			cli, err := k8sutil.KubeClient()
 			if err != nil {
@@ -29,7 +26,7 @@ func UpgradeCmd() *cobra.Command {
 				return fmt.Errorf("failed to upgrade: %w", err)
 			}
 
-			log.Info("Upgrade command completed successfully")
+			fmt.Println("Upgrade command completed successfully")
 			return nil
 		},
 	}

@@ -7,7 +7,6 @@ import (
 	"sort"
 
 	jsonpatch "github.com/evanphx/json-patch"
-	helmv1beta1 "github.com/k0sproject/k0s/pkg/apis/helm/v1beta1"
 	k0sv1beta1 "github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
 	"github.com/replicatedhq/embedded-cluster-kinds/apis/v1beta1"
 	clusterv1beta1 "github.com/replicatedhq/embedded-cluster-kinds/apis/v1beta1"
@@ -18,8 +17,9 @@ import (
 )
 
 const (
-	chartName      = "embedded-cluster-operator"
-	chartNamespace = "kube-system"
+	chartName              = "embedded-cluster-operator"
+	clusterConfigName      = "k0s"
+	clusterConfigNamespace = "kube-system"
 )
 
 func Upgrade(ctx context.Context, cli client.Client) error {
@@ -33,73 +33,97 @@ func Upgrade(ctx context.Context, cli client.Client) error {
 		return fmt.Errorf("get release metadata: %w", err)
 	}
 
-	existing, err := getExistingOperatorChart(ctx, cli)
-	if err != nil {
-		return fmt.Errorf("get existing operator chart: %w", err)
-	}
-
-	chart, err := getOperatorChartFromMetadata(metadata)
+	operatorChart, err := getOperatorChartFromMetadata(metadata)
 	if err != nil {
 		return fmt.Errorf("get operator chart from metadata: %w", err)
 	}
 
-	err = patchOperatorChart(ctx, cli, existing, chart)
+	clusterConfig, err := getExistingClusterConfig(ctx, cli)
 	if err != nil {
-		return fmt.Errorf("patch operator chart: %w", err)
+		return fmt.Errorf("get existing clusterconfig: %w", err)
+	}
+
+	// NOTE: It is not optimal to patch the cluster config prior to upgrading the cluster because
+	// the crd could be out of date. Ideally we would first run the auto-pilot upgrade and then
+	// patch the cluster config, but this command is run from an ephemeral binary in the pod, and
+	// when the cluster is upgraded it may no longer be available.
+
+	err = patchClusterConfig(ctx, cli, clusterConfig, operatorChart)
+	if err != nil {
+		return fmt.Errorf("patch clusterconfig: %w", err)
 	}
 
 	return nil
 }
 
-func patchOperatorChart(ctx context.Context, cli client.Client, existing *helmv1beta1.Chart, chart *k0sv1beta1.Chart) error {
-	original, err := json.Marshal(existing)
+func patchClusterConfig(ctx context.Context, cli client.Client, clusterConfig *k0sv1beta1.ClusterConfig, operatorChart k0sv1beta1.Chart) error {
+	desired := setClusterConfigOperatorChart(clusterConfig, operatorChart)
+
+	original, err := json.MarshalIndent(clusterConfig, "", "  ")
 	if err != nil {
-		return fmt.Errorf("marshal existing chart: %w", err)
+		return fmt.Errorf("marshal existing clusterconfig: %w", err)
 	}
 
-	desired := existing.DeepCopy()
-	desired.Spec.ChartName = chart.ChartName
-	desired.Spec.Version = chart.Version
-	desired.Spec.Values = chart.Values
-	desired.Spec.Namespace = chart.TargetNS
-	desired.Spec.Timeout = chart.Timeout.String()
-	desired.Spec.Order = chart.Order
-
-	modified, err := json.Marshal(desired)
+	modified, err := json.MarshalIndent(desired, "", "  ")
 	if err != nil {
-		return fmt.Errorf("marshal desired chart: %w", err)
+		return fmt.Errorf("marshal desired clusterconfig: %w", err)
 	}
 
 	patchData, err := jsonpatch.CreateMergePatch(original, modified)
 	if err != nil {
 		return fmt.Errorf("create json merge patch: %w", err)
 	}
+
+	fmt.Printf("Patching K0s cluster config with merge patch: %s\n", string(patchData))
+
 	patch := client.RawPatch(types.MergePatchType, patchData)
-	err = cli.Patch(ctx, existing, patch)
+	err = cli.Patch(ctx, clusterConfig, patch)
 	if err != nil {
-		return fmt.Errorf("patch chart: %w", err)
+		return fmt.Errorf("patch clusterconfig: %w", err)
 	}
+
+	fmt.Println("K0s cluster config patched")
 
 	return nil
 }
 
-func getExistingOperatorChart(ctx context.Context, cli client.Client) (*helmv1beta1.Chart, error) {
-	chart := &helmv1beta1.Chart{}
-	name := fmt.Sprintf("k0s-addon-chart-%s", chartName)
-	err := cli.Get(ctx, client.ObjectKey{Name: name, Namespace: chartNamespace}, chart)
+func setClusterConfigOperatorChart(clusterConfig *k0sv1beta1.ClusterConfig, operatorChart k0sv1beta1.Chart) *k0sv1beta1.ClusterConfig {
+	desired := clusterConfig.DeepCopy()
+	if desired.Spec == nil {
+		desired.Spec = &k0sv1beta1.ClusterSpec{}
+	}
+	if desired.Spec.Extensions == nil {
+		desired.Spec.Extensions = &k0sv1beta1.ClusterExtensions{}
+	}
+	if desired.Spec.Extensions.Helm == nil {
+		desired.Spec.Extensions.Helm = &k0sv1beta1.HelmExtensions{}
+	}
+	for i, chart := range desired.Spec.Extensions.Helm.Charts {
+		if chart.Name == operatorChart.Name {
+			desired.Spec.Extensions.Helm.Charts[i] = operatorChart
+			return desired
+		}
+	}
+	desired.Spec.Extensions.Helm.Charts = append(desired.Spec.Extensions.Helm.Charts, operatorChart)
+	return desired
+}
+
+func getExistingClusterConfig(ctx context.Context, cli client.Client) (*k0sv1beta1.ClusterConfig, error) {
+	clusterConfig := &k0sv1beta1.ClusterConfig{}
+	err := cli.Get(ctx, client.ObjectKey{Name: clusterConfigName, Namespace: clusterConfigNamespace}, clusterConfig)
 	if err != nil {
 		return nil, fmt.Errorf("get chart: %w", err)
 	}
-	return chart, nil
+	return clusterConfig, nil
 }
 
-func getOperatorChartFromMetadata(metadata *ectypes.ReleaseMetadata) (*k0sv1beta1.Chart, error) {
+func getOperatorChartFromMetadata(metadata *ectypes.ReleaseMetadata) (k0sv1beta1.Chart, error) {
 	for _, chart := range metadata.Configs.Charts {
 		if chart.Name == chartName {
-			return &chart, nil
+			return chart, nil
 		}
 	}
-	return nil, fmt.Errorf("chart not found")
+	return k0sv1beta1.Chart{}, fmt.Errorf("chart not found")
 }
 
 func getCurrentInstallation(ctx context.Context, cli client.Client) (*v1beta1.Installation, error) {

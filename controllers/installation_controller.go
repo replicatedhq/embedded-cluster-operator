@@ -1084,6 +1084,7 @@ func (r *InstallationReconciler) StartUpgrade(ctx context.Context, in *v1beta1.I
 		return fmt.Errorf("failed to get server version: %w", err)
 	}
 	// TODO(upgrade): what if there is already a plan in progress?
+	// TODO(upgrade): k8s server version does not have k0s version encoded in it
 	if meta.Versions["Kubernetes"] != serverVersion.GitVersion {
 		commands = append(commands, apv1b2.PlanCommand{
 			K0sUpdate: &apv1b2.PlanCommandK0sUpdate{

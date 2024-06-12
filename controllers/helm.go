@@ -45,7 +45,7 @@ func setHelmValue(valuesYaml string, path string, newValue interface{}) (string,
 }
 
 // merge the default helm charts and repositories (from meta.Configs) with vendor helm charts (from in.Spec.Config.Extensions.Helm)
-func mergeHelmConfigs(ctx context.Context, meta *ectypes.ReleaseMetadata, in *v1beta1.Installation, clusterConfig k0sv1beta1.ClusterConfig) (*v1beta1.Helm, error) {
+func mergeHelmConfigs(ctx context.Context, meta *ectypes.ReleaseMetadata, in *v1beta1.Installation, clusterConfig k0sv1beta1.ClusterConfig) *v1beta1.Helm {
 	// merge default helm charts (from meta.Configs) with vendor helm charts (from in.Spec.Config.Extensions.Helm)
 	combinedConfigs := &v1beta1.Helm{ConcurrencyLevel: 1}
 	if meta != nil {
@@ -112,7 +112,7 @@ func mergeHelmConfigs(ctx context.Context, meta *ectypes.ReleaseMetadata, in *v1
 	for k := range combinedConfigs.Charts {
 		combinedConfigs.Charts[k].Order += 100
 	}
-	return combinedConfigs, nil
+	return combinedConfigs
 }
 
 // update the 'admin-console' and 'embedded-cluster-operator' charts to add cluster ID, binary name, airgap status, and HA status

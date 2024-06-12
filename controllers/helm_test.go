@@ -26,7 +26,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 		airgap           bool
 		highAvailability bool
 		disasterRecovery bool
-		want             *k0sv1beta1.HelmExtensions
+		want             *v1beta1.Helm
 	}{
 		{
 			name: "no meta",
@@ -46,10 +46,10 @@ func Test_mergeHelmConfigs(t *testing.T) {
 					},
 				},
 			},
-			want: &k0sv1beta1.HelmExtensions{
+			want: &v1beta1.Helm{
 				ConcurrencyLevel: 1,
 				Repositories:     nil,
-				Charts: []k0sv1beta1.Chart{
+				Charts: []v1beta1.Chart{
 					{
 						Name:    "test",
 						Version: "1.0.0",
@@ -92,7 +92,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 					},
 				},
 			},
-			want: &k0sv1beta1.HelmExtensions{
+			want: &v1beta1.Helm{
 				ConcurrencyLevel: 1,
 				Repositories: []k0sv1beta1.Repository{
 					{
@@ -102,7 +102,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 						Name: "newrepo",
 					},
 				},
-				Charts: []k0sv1beta1.Chart{
+				Charts: []v1beta1.Chart{
 					{
 						Name:  "origchart",
 						Order: 110,
@@ -150,7 +150,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 				},
 				in: v1beta1.Extensions{},
 			},
-			want: &k0sv1beta1.HelmExtensions{
+			want: &v1beta1.Helm{
 				ConcurrencyLevel: 1,
 				Repositories: []k0sv1beta1.Repository{
 					{
@@ -160,7 +160,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 						Name: "velerorepo",
 					},
 				},
-				Charts: []k0sv1beta1.Chart{
+				Charts: []v1beta1.Chart{
 					{
 						Name:  "origchart",
 						Order: 100,
@@ -233,7 +233,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 				},
 				in: v1beta1.Extensions{},
 			},
-			want: &k0sv1beta1.HelmExtensions{
+			want: &v1beta1.Helm{
 				ConcurrencyLevel: 1,
 				Repositories: []k0sv1beta1.Repository{
 					{
@@ -243,7 +243,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 						Name: "registryrepo",
 					},
 				},
-				Charts: []k0sv1beta1.Chart{
+				Charts: []v1beta1.Chart{
 					{
 						Name:  "origchart",
 						Order: 100,
@@ -324,7 +324,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 					},
 				},
 			},
-			want: &k0sv1beta1.HelmExtensions{
+			want: &v1beta1.Helm{
 				ConcurrencyLevel: 1,
 				Repositories: []k0sv1beta1.Repository{
 					{
@@ -337,7 +337,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 						Name: "registryharepo",
 					},
 				},
-				Charts: []k0sv1beta1.Chart{
+				Charts: []v1beta1.Chart{
 					{
 						Name:  "origchart",
 						Order: 100,
@@ -422,7 +422,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 					},
 				},
 			},
-			want: &k0sv1beta1.HelmExtensions{
+			want: &v1beta1.Helm{
 				ConcurrencyLevel: 1,
 				Repositories: []k0sv1beta1.Repository{
 					{
@@ -432,7 +432,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 						Name: "seaweedfsrepo",
 					},
 				},
-				Charts: []k0sv1beta1.Chart{
+				Charts: []v1beta1.Chart{
 					{
 						Name:  "origchart",
 						Order: 100,
@@ -1107,7 +1107,7 @@ func Test_applyUserProvidedAddonOverrides(t *testing.T) {
 		name         string
 		installation *v1beta1.Installation
 		config       *v1beta1.Helm
-		want         *k0sv1beta1.HelmExtensions
+		want         *v1beta1.Helm
 	}{
 		{
 			name:         "no config",
@@ -1121,8 +1121,8 @@ func Test_applyUserProvidedAddonOverrides(t *testing.T) {
 					},
 				},
 			},
-			want: &k0sv1beta1.HelmExtensions{
-				Charts: []k0sv1beta1.Chart{
+			want: &v1beta1.Helm{
+				Charts: []v1beta1.Chart{
 					{
 						Name:    "test",
 						Version: "1.0.0",
@@ -1151,8 +1151,8 @@ func Test_applyUserProvidedAddonOverrides(t *testing.T) {
 					},
 				},
 			},
-			want: &k0sv1beta1.HelmExtensions{
-				Charts: []k0sv1beta1.Chart{
+			want: &v1beta1.Helm{
+				Charts: []v1beta1.Chart{
 					{
 						Name:    "test",
 						Version: "1.0.0",
@@ -1186,8 +1186,8 @@ func Test_applyUserProvidedAddonOverrides(t *testing.T) {
 					},
 				},
 			},
-			want: &k0sv1beta1.HelmExtensions{
-				Charts: []k0sv1beta1.Chart{
+			want: &v1beta1.Helm{
+				Charts: []v1beta1.Chart{
 					{
 						Name:    "test",
 						Version: "1.0.0",
@@ -1221,8 +1221,8 @@ func Test_applyUserProvidedAddonOverrides(t *testing.T) {
 					},
 				},
 			},
-			want: &k0sv1beta1.HelmExtensions{
-				Charts: []k0sv1beta1.Chart{
+			want: &v1beta1.Helm{
+				Charts: []v1beta1.Chart{
 					{
 						Name:    "test",
 						Version: "1.0.0",
@@ -1272,7 +1272,7 @@ func Test_applyUserProvidedAddonOverrides(t *testing.T) {
 					},
 				},
 			},
-			want: &k0sv1beta1.HelmExtensions{
+			want: &v1beta1.Helm{
 				ConcurrencyLevel: 999,
 				Repositories: []k0sv1beta1.Repository{
 					{
@@ -1280,7 +1280,7 @@ func Test_applyUserProvidedAddonOverrides(t *testing.T) {
 						URL:  "https://repo",
 					},
 				},
-				Charts: []k0sv1beta1.Chart{
+				Charts: []v1beta1.Chart{
 					{
 						Name:    "chart0",
 						Version: "1.0.0",

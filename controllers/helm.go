@@ -144,6 +144,27 @@ func updateInfraChartsFromInstall(ctx context.Context, in *v1beta1.Installation,
 				continue
 			}
 
+			if in.Spec.Proxy != nil {
+				extraEnv := []map[string]interface{}{}
+				extraEnv = append(extraEnv, map[string]interface{}{
+					"name":  "HTTP_PROXY",
+					"value": in.Spec.Proxy.HTTPProxy,
+				})
+				extraEnv = append(extraEnv, map[string]interface{}{
+					"name":  "HTTPS_PROXY",
+					"value": in.Spec.Proxy.HTTPSProxy,
+				})
+				extraEnv = append(extraEnv, map[string]interface{}{
+					"name":  "NO_PROXY",
+					"value": in.Spec.Proxy.NoProxy,
+				})
+				newVals, err = setHelmValue(newVals, "extraEnv", extraEnv)
+				if err != nil {
+					log.Error(err, "failed to set helm values extraEnv", "chart", chart.Name)
+					continue
+				}
+			}
+
 			charts[i].Values = newVals
 		}
 		if chart.Name == "embedded-cluster-operator" {
@@ -158,6 +179,27 @@ func updateInfraChartsFromInstall(ctx context.Context, in *v1beta1.Installation,
 			if err != nil {
 				log.Error(err, "failed to set helm values embeddedClusterID", "chart", chart.Name)
 				continue
+			}
+
+			if in.Spec.Proxy != nil {
+				extraEnv := []map[string]interface{}{}
+				extraEnv = append(extraEnv, map[string]interface{}{
+					"name":  "HTTP_PROXY",
+					"value": in.Spec.Proxy.HTTPProxy,
+				})
+				extraEnv = append(extraEnv, map[string]interface{}{
+					"name":  "HTTPS_PROXY",
+					"value": in.Spec.Proxy.HTTPSProxy,
+				})
+				extraEnv = append(extraEnv, map[string]interface{}{
+					"name":  "NO_PROXY",
+					"value": in.Spec.Proxy.NoProxy,
+				})
+				newVals, err = setHelmValue(newVals, "extraEnv", extraEnv)
+				if err != nil {
+					log.Error(err, "failed to set helm values extraEnv", "chart", chart.Name)
+					continue
+				}
 			}
 
 			charts[i].Values = newVals

@@ -42,11 +42,9 @@ spec:
               extensions:
                 properties:
                   helm:
-                    description: HelmExtensions specifies settings for cluster helm
-                      based extensions
+                    description: Helm contains helm extension settings
                     properties:
                       charts:
-                        description: ChartsSettings charts settings
                         items:
                           description: Chart single helm addon
                           properties:
@@ -59,16 +57,19 @@ spec:
                             order:
                               type: integer
                             timeout:
-                              description: |-
-                                A Duration represents the elapsed time between two instants
-                                as an int64 nanosecond count. The representation limits the
-                                largest representable duration to approximately 290 years.
+                              description: Timeout specifies the timeout for how long
+                                to wait for the chart installation to finish.
                               format: int64
                               type: integer
                             values:
                               type: string
                             version:
                               type: string
+                          required:
+                          - chartname
+                          - name
+                          - namespace
+                          - version
                           type: object
                         type: array
                       concurrencyLevel:

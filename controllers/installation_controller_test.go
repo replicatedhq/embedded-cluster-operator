@@ -76,8 +76,8 @@ func TestInstallationReconciler_ReconcileHelmCharts(t *testing.T) {
 					Config: &v1beta1.ConfigSpec{
 						Version: "goodver",
 						Extensions: v1beta1.Extensions{
-							Helm: &k0sv1beta1.HelmExtensions{
-								Charts: []k0sv1beta1.Chart{
+							Helm: &v1beta1.Helm{
+								Charts: []v1beta1.Chart{
 									{
 										Name:    "extchart",
 										Version: "2",
@@ -102,8 +102,8 @@ func TestInstallationReconciler_ReconcileHelmCharts(t *testing.T) {
 					Config: &v1beta1.ConfigSpec{
 						Version: "goodver",
 						Extensions: v1beta1.Extensions{
-							Helm: &k0sv1beta1.HelmExtensions{
-								Charts: []k0sv1beta1.Chart{
+							Helm: &v1beta1.Helm{
+								Charts: []v1beta1.Chart{
 									{
 										Name:    "extchart",
 										Version: "2",
@@ -177,8 +177,8 @@ func TestInstallationReconciler_ReconcileHelmCharts(t *testing.T) {
 					Config: &v1beta1.ConfigSpec{
 						Version: "goodver",
 						Extensions: v1beta1.Extensions{
-							Helm: &k0sv1beta1.HelmExtensions{
-								Charts: []k0sv1beta1.Chart{
+							Helm: &v1beta1.Helm{
+								Charts: []v1beta1.Chart{
 									{
 										Name:    "extchart",
 										Version: "2",
@@ -305,8 +305,8 @@ func TestInstallationReconciler_ReconcileHelmCharts(t *testing.T) {
 					Config: &v1beta1.ConfigSpec{
 						Version: "goodver",
 						Extensions: v1beta1.Extensions{
-							Helm: &k0sv1beta1.HelmExtensions{
-								Charts: []k0sv1beta1.Chart{
+							Helm: &v1beta1.Helm{
+								Charts: []v1beta1.Chart{
 									{
 										Name:    "extchart",
 										Version: "2",
@@ -354,8 +354,8 @@ func TestInstallationReconciler_ReconcileHelmCharts(t *testing.T) {
 					Config: &v1beta1.ConfigSpec{
 						Version: "goodver",
 						Extensions: v1beta1.Extensions{
-							Helm: &k0sv1beta1.HelmExtensions{
-								Charts: []k0sv1beta1.Chart{
+							Helm: &v1beta1.Helm{
+								Charts: []v1beta1.Chart{
 									{
 										Name:    "extchart",
 										Version: "2",
@@ -423,8 +423,8 @@ func TestInstallationReconciler_ReconcileHelmCharts(t *testing.T) {
 					Config: &v1beta1.ConfigSpec{
 						Version: "goodver",
 						Extensions: v1beta1.Extensions{
-							Helm: &k0sv1beta1.HelmExtensions{
-								Charts: []k0sv1beta1.Chart{
+							Helm: &v1beta1.Helm{
+								Charts: []v1beta1.Chart{
 									{
 										Name:    "extchart",
 										Version: "2",
@@ -543,8 +543,8 @@ password: frommeta`,
 					Config: &v1beta1.ConfigSpec{
 						Version: "goodver",
 						Extensions: v1beta1.Extensions{
-							Helm: &k0sv1beta1.HelmExtensions{
-								Charts: []k0sv1beta1.Chart{
+							Helm: &v1beta1.Helm{
+								Charts: []v1beta1.Chart{
 									{
 										Name:    "extchart",
 										Version: "2",

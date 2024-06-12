@@ -115,4 +115,4 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
 
-replace github.com/replicatedhq/embedded-cluster-kinds => /Users/dan/go/src/github.com/replicatedhq/embedded-cluster-kinds
+replace github.com/replicatedhq/embedded-cluster-kinds => /home/sparrow/go/src/github.com/replicatedhq/embedded-cluster-kinds

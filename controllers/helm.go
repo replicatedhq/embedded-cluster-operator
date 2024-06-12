@@ -45,9 +45,9 @@ func setHelmValue(valuesYaml string, path string, newValue interface{}) (string,
 }
 
 // merge the default helm charts and repositories (from meta.Configs) with vendor helm charts (from in.Spec.Config.Extensions.Helm)
-func mergeHelmConfigs(ctx context.Context, meta *ectypes.ReleaseMetadata, in *v1beta1.Installation, clusterConfig k0sv1beta1.ClusterConfig) *k0sv1beta1.HelmExtensions {
+func mergeHelmConfigs(ctx context.Context, meta *ectypes.ReleaseMetadata, in *v1beta1.Installation, clusterConfig k0sv1beta1.ClusterConfig) (*v1beta1.Helm, error) {
 	// merge default helm charts (from meta.Configs) with vendor helm charts (from in.Spec.Config.Extensions.Helm)
-	combinedConfigs := &k0sv1beta1.HelmExtensions{ConcurrencyLevel: 1}
+	combinedConfigs := &v1beta1.Helm{ConcurrencyLevel: 1}
 	if meta != nil {
 		combinedConfigs.Charts = meta.Configs.Charts
 		combinedConfigs.Repositories = meta.Configs.Repositories
@@ -112,11 +112,11 @@ func mergeHelmConfigs(ctx context.Context, meta *ectypes.ReleaseMetadata, in *v1
 	for k := range combinedConfigs.Charts {
 		combinedConfigs.Charts[k].Order += 100
 	}
-	return combinedConfigs
+	return combinedConfigs, nil
 }
 
 // update the 'admin-console' and 'embedded-cluster-operator' charts to add cluster ID, binary name, airgap status, and HA status
-func updateInfraChartsFromInstall(ctx context.Context, in *v1beta1.Installation, clusterConfig k0sv1beta1.ClusterConfig, charts k0sv1beta1.ChartsSettings) k0sv1beta1.ChartsSettings {
+func updateInfraChartsFromInstall(ctx context.Context, in *v1beta1.Installation, clusterConfig k0sv1beta1.ClusterConfig, charts []v1beta1.Chart) []v1beta1.Chart {
 	log := ctrl.LoggerFrom(ctx)
 
 	if in == nil {
@@ -314,12 +314,12 @@ func detectChartCompletion(combinedConfigs *k0sv1beta1.HelmExtensions, installed
 }
 
 // applyUserProvidedAddonOverrides applies user-provided overrides to the HelmExtensions spec.
-func applyUserProvidedAddonOverrides(in *v1beta1.Installation, combinedConfigs *k0sv1beta1.HelmExtensions) (*k0sv1beta1.HelmExtensions, error) {
+func applyUserProvidedAddonOverrides(in *v1beta1.Installation, combinedConfigs *v1beta1.Helm) (*v1beta1.Helm, error) {
 	if in == nil || in.Spec.Config == nil {
 		return combinedConfigs, nil
 	}
 	patchedConfigs := combinedConfigs.DeepCopy()
-	patchedConfigs.Charts = k0sv1beta1.ChartsSettings{}
+	patchedConfigs.Charts = []v1beta1.Chart{}
 	for _, chart := range combinedConfigs.Charts {
 		newValues, err := in.Spec.Config.ApplyEndUserAddOnOverrides(chart.Name, chart.Values)
 		if err != nil {
@@ -335,7 +335,7 @@ func applyUserProvidedAddonOverrides(in *v1beta1.Installation, combinedConfigs *
 // sure that all helm charts point to a chart stored on disk as a tgz file. These files are already
 // expected to be present on the disk and, during an upgrade, are laid down on disk by the artifact
 // copy job.
-func patchExtensionsForAirGap(config *k0sv1beta1.HelmExtensions) *k0sv1beta1.HelmExtensions {
+func patchExtensionsForAirGap(config *v1beta1.Helm) *v1beta1.Helm {
 	config.Repositories = nil
 	for idx, chart := range config.Charts {
 		chartName := fmt.Sprintf("%s-%s.tgz", chart.Name, chart.Version)

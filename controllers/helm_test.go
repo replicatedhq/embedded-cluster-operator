@@ -33,10 +33,10 @@ func Test_mergeHelmConfigs(t *testing.T) {
 			args: args{
 				meta: nil,
 				in: v1beta1.Extensions{
-					Helm: &k0sv1beta1.HelmExtensions{
+					Helm: &v1beta1.Helm{
 						ConcurrencyLevel: 2,
 						Repositories:     nil,
-						Charts: []k0sv1beta1.Chart{
+						Charts: []v1beta1.Chart{
 							{
 								Name:    "test",
 								Version: "1.0.0",
@@ -77,13 +77,13 @@ func Test_mergeHelmConfigs(t *testing.T) {
 					},
 				},
 				in: v1beta1.Extensions{
-					Helm: &k0sv1beta1.HelmExtensions{
+					Helm: &v1beta1.Helm{
 						Repositories: []k0sv1beta1.Repository{
 							{
 								Name: "newrepo",
 							},
 						},
-						Charts: []k0sv1beta1.Chart{
+						Charts: []v1beta1.Chart{
 							{
 								Name:    "newchart",
 								Version: "1.0.0",
@@ -465,7 +465,8 @@ func Test_mergeHelmConfigs(t *testing.T) {
 			}
 
 			req := require.New(t)
-			got := mergeHelmConfigs(context.TODO(), tt.args.meta, &installation, tt.args.clusterConfig)
+			got, err := mergeHelmConfigs(context.TODO(), tt.args.meta, &installation, tt.args.clusterConfig)
+			req.Empty(err)
 			req.Equal(tt.want, got)
 		})
 	}

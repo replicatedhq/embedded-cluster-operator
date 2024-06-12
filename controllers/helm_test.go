@@ -1314,7 +1314,7 @@ func Test_updateInfraChartsFromInstall(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want []k0sv1beta1.Chart
+		want []v1beta1.Chart
 	}{
 		{
 			name: "other chart",
@@ -1331,7 +1331,7 @@ func Test_updateInfraChartsFromInstall(t *testing.T) {
 					},
 				},
 			},
-			want: []k0sv1beta1.Chart{
+			want: []v1beta1.Chart{
 				{
 					Name:   "test",
 					Values: "abc: xyz",
@@ -1364,7 +1364,7 @@ func Test_updateInfraChartsFromInstall(t *testing.T) {
 					},
 				},
 			},
-			want: []k0sv1beta1.Chart{
+			want: []v1beta1.Chart{
 				{
 					Name:   "test",
 					Values: "abc: xyz",
@@ -1397,7 +1397,7 @@ func Test_updateInfraChartsFromInstall(t *testing.T) {
 					},
 				},
 			},
-			want: []k0sv1beta1.Chart{
+			want: []v1beta1.Chart{
 				{
 					Name:   "docker-registry",
 					Values: "this: that\nand: another\n",
@@ -1435,7 +1435,7 @@ secrets:
 					},
 				},
 			},
-			want: []k0sv1beta1.Chart{
+			want: []v1beta1.Chart{
 				{
 					Name: "docker-registry",
 					Values: `image:

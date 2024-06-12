@@ -3,26 +3,21 @@ package cli
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
 
 	clusterv1beta1 "github.com/replicatedhq/embedded-cluster-kinds/apis/v1beta1"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/k8sutil"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/upgrade"
 	"github.com/spf13/cobra"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-)
-
-const (
-	DefaultInstallationSecretNamespace = "embedded-cluster"
-	DefaultInstallationSecretKey       = "installation.yaml"
 )
 
 // UpgradeCmd returns a cobra command for upgrading the embedded cluster operator.
 // It is called by KOTS admin console to upgrade the embedded cluster operator and installation.
 func UpgradeCmd() *cobra.Command {
-	var secretName, secretNamespace, secretKey string
+	var installationFile string
 
 	cmd := &cobra.Command{
 		Use:          "upgrade",
@@ -36,12 +31,17 @@ func UpgradeCmd() *cobra.Command {
 				return fmt.Errorf("failed to create kubernetes client: %w", err)
 			}
 
-			data, err := getInstallationFromSecret(cmd.Context(), cli, secretName, secretNamespace, secretKey)
+			installationData, err := readInstallationFile(installationFile)
 			if err != nil {
-				return fmt.Errorf("get installation from secret: %w", err)
+				return fmt.Errorf("failed to read installation file: %w", err)
 			}
 
-			err = upgrade.Upgrade(cmd.Context(), cli, data)
+			in, err := decodeInstallation(cmd.Context(), cli, []byte(installationData))
+			if err != nil {
+				return fmt.Errorf("failed to decode installation: %w", err)
+			}
+
+			err = upgrade.Upgrade(cmd.Context(), cli, in)
 			if err != nil {
 				return fmt.Errorf("failed to upgrade: %w", err)
 			}
@@ -51,42 +51,35 @@ func UpgradeCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&secretName, "installation-secret", "", "The name of the secret containing the installation custom resource")
-	err := cmd.MarkFlagRequired("installation-secret")
+	cmd.Flags().StringVar(&installationFile, "installation", "", "Path to the installation file")
+	err := cmd.MarkFlagRequired("installation")
 	if err != nil {
 		panic(err)
 	}
-	cmd.Flags().StringVar(&secretNamespace, "installation-secret-namespace", DefaultInstallationSecretNamespace, "The namespace of the secret containing the installation custom resource")
-	cmd.Flags().StringVar(&secretKey, "installation-secret-key", DefaultInstallationSecretKey, "The key in the secret containing the installation custom resource")
 
 	return cmd
 }
 
-func getInstallationFromSecret(ctx context.Context, cli client.Client, name, namespace, key string) (*clusterv1beta1.Installation, error) {
-	if name == "" {
-		return nil, fmt.Errorf("installation secret name is required")
+func readInstallationFile(path string) ([]byte, error) {
+	if path == "-" {
+		b, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			return nil, fmt.Errorf("read stdin: %w", err)
+		}
+		return b, nil
 	}
-	if namespace == "" {
-		namespace = DefaultInstallationSecretNamespace
-	}
-	if key == "" {
-		key = DefaultInstallationSecretKey
-	}
-
-	var secret corev1.Secret
-	err := cli.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, &secret)
+	b, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("get secret: %w", err)
+		return nil, fmt.Errorf("read file: %w", err)
 	}
+	return b, nil
+}
 
-	if len(secret.Data[key]) == 0 {
-		return nil, fmt.Errorf("key not found in secret")
-	}
-
+func decodeInstallation(ctx context.Context, cli client.Client, data []byte) (*clusterv1beta1.Installation, error) {
 	decode := serializer.NewCodecFactory(cli.Scheme()).UniversalDeserializer().Decode
-	obj, _, err := decode(secret.Data[key], nil, nil)
+	obj, _, err := decode(data, nil, nil)
 	if err != nil {
-		return nil, fmt.Errorf("decode secret data: %w", err)
+		return nil, fmt.Errorf("decode: %w", err)
 	}
 
 	in, ok := obj.(*clusterv1beta1.Installation)

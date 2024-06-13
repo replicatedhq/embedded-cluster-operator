@@ -862,9 +862,6 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 	}
 
 	combinedConfigs := mergeHelmConfigs(ctx, meta, in, clusterConfig)
-	if err != nil {
-		return fmt.Errorf("failed to merge helm configs: %w", err)
-	}
 
 	if in.Spec.AirGap {
 		// if in airgap mode then all charts are already on the node's disk. we just need to
@@ -878,12 +875,11 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 		return fmt.Errorf("failed to apply user provided overrides: %w", err)
 	}
 
-	ext := &v1beta1.Extensions{
-		Helm: combinedConfigs,
-	}
-
 	cfgs := &k0sv1beta1.HelmExtensions{}
-	cfgs, err = v1beta1.ConvertTo(*ext, cfgs)
+	cfgs, err = v1beta1.ConvertTo(*combinedConfigs, cfgs)
+  if err != nil {
+    return fmt.Errorf("failed to convert chart types: %w", err)
+  }
 
 	existingHelm := &k0sv1beta1.HelmExtensions{}
 	if clusterConfig.Spec != nil && clusterConfig.Spec.Extensions != nil && clusterConfig.Spec.Extensions.Helm != nil {

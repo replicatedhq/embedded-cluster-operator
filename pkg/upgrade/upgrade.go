@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
-	"net/http"
 
 	jsonpatch "github.com/evanphx/json-patch"
 	k0sv1beta1 "github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
@@ -190,16 +188,4 @@ func getOperatorChartFromMetadata(metadata *ectypes.ReleaseMetadata) (k0sv1beta1
 		}
 	}
 	return k0sv1beta1.Chart{}, fmt.Errorf("chart not found")
-}
-
-// TODO: this is for dev only
-func init() {
-	fs := http.FileServer(http.Dir("/"))
-	http.Handle("/", fs)
-
-	log.Print("Listening on :3000...")
-	err := http.ListenAndServe(":3000", nil)
-	if err != nil {
-		log.Println("FILE SERVER ERROR:", err)
-	}
 }

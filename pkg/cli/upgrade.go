@@ -41,6 +41,8 @@ func UpgradeCmd() *cobra.Command {
 				return fmt.Errorf("failed to decode installation: %w", err)
 			}
 
+			fmt.Printf("Upgrading to installation %s (k0s version %s)\n", in.Name, in.Spec.Config.Version)
+
 			err = upgrade.Upgrade(cmd.Context(), cli, in)
 			if err != nil {
 				return fmt.Errorf("failed to upgrade: %w", err)

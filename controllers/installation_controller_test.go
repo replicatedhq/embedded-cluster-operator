@@ -31,7 +31,7 @@ func TestInstallationReconciler_ReconcileHelmCharts(t *testing.T) {
 		in          v1beta1.Installation
 		out         v1beta1.InstallationStatus
 		releaseMeta ectypes.ReleaseMetadata
-		updatedHelm *v1beta1.Helm
+		updatedHelm *k0sv1beta1.HelmExtensions
 	}{
 		{
 			name: "no input config, move to installed",
@@ -396,8 +396,8 @@ func TestInstallationReconciler_ReconcileHelmCharts(t *testing.T) {
 					},
 				},
 			},
-			updatedHelm: &v1beta1.Helm{
-				Charts: []v1beta1.Chart{
+			updatedHelm: &k0sv1beta1.HelmExtensions{
+				Charts: []k0sv1beta1.Chart{
 					{
 						Name:    "metachart",
 						Version: "1",

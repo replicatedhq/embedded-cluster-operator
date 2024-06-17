@@ -1,8 +1,10 @@
 package cli
 
 import (
+	"context"
 	"os"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"k8s.io/client-go/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -15,6 +17,10 @@ import (
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/k8sutil"
 )
 
+var (
+	setupLog = ctrl.Log.WithName("setup")
+)
+
 func RootCmd() *cobra.Command {
 	var metricsAddr string
 	var enableLeaderElection bool
@@ -25,7 +31,8 @@ func RootCmd() *cobra.Command {
 		Short:        "Embedded Cluster Operator",
 		SilenceUsage: true,
 		Run: func(cmd *cobra.Command, args []string) {
-			log := ctrl.LoggerFrom(cmd.Context())
+			zaplog := zap.New(zap.UseDevMode(true))
+			ctrl.SetLogger(zaplog)
 
 			mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 				Scheme: k8sutil.Scheme(),
@@ -39,7 +46,7 @@ func RootCmd() *cobra.Command {
 				LeaderElectionReleaseOnCancel: true,
 			})
 			if err != nil {
-				log.Error(err, "unable to start manager")
+				setupLog.Error(err, "unable to start manager")
 				os.Exit(1)
 			}
 
@@ -48,28 +55,28 @@ func RootCmd() *cobra.Command {
 				Scheme:    mgr.GetScheme(),
 				Discovery: discovery.NewDiscoveryClientForConfigOrDie(ctrl.GetConfigOrDie()),
 			}).SetupWithManager(mgr); err != nil {
-				log.Error(err, "unable to create controller", "controller", "Installation")
+				setupLog.Error(err, "unable to create controller", "controller", "Installation")
 				os.Exit(1)
 			}
 
 			if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-				log.Error(err, "unable to set up health check")
+				setupLog.Error(err, "unable to set up health check")
 				os.Exit(1)
 			}
 			if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-				log.Error(err, "unable to set up ready check")
+				setupLog.Error(err, "unable to set up ready check")
 				os.Exit(1)
 			}
 
-			log.Info("Starting manager")
-			if err := mgr.Start(cmd.Context()); err != nil {
-				log.Error(err, "problem running manager")
+			setupLog.Info("Starting manager")
+			if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+				setupLog.Error(err, "problem running manager")
 				os.Exit(1)
 			}
 		},
 	}
 
-	setupLog(cmd)
+	setupCLILog(cmd)
 	addSubcommands(cmd)
 
 	cmd.Flags().StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
@@ -81,13 +88,9 @@ func RootCmd() *cobra.Command {
 	return cmd
 }
 
-func setupLog(cmd *cobra.Command) {
-	log := ctrl.Log.WithName("cli")
-
-	zaplog := zap.New(zap.UseDevMode(true))
-	ctrl.SetLogger(zaplog)
-
-	ctx := ctrl.SetupSignalHandler()
+func setupCLILog(cmd *cobra.Command) {
+	ctx := context.Background()
+	log := MustNewLogger(logrus.InfoLevel)
 	ctx = ctrl.LoggerInto(ctx, log)
 	cmd.SetContext(ctx)
 }

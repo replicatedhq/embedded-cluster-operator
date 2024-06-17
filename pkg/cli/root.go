@@ -1,7 +1,7 @@
 package cli
 
 import (
-	"context"
+	"fmt"
 	"os"
 
 	"github.com/sirupsen/logrus"
@@ -22,6 +22,7 @@ var (
 )
 
 func RootCmd() *cobra.Command {
+	var logLevel string
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
@@ -30,6 +31,17 @@ func RootCmd() *cobra.Command {
 		Use:          "manager",
 		Short:        "Embedded Cluster Operator",
 		SilenceUsage: true,
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			lvl, err := logrus.ParseLevel(logLevel)
+			if err != nil {
+				return fmt.Errorf("failed to parse log level: %w", err)
+			}
+			err = setupCLILog(cmd, lvl)
+			if err != nil {
+				return fmt.Errorf("failed to setup log: %w", err)
+			}
+			return nil
+		},
 		Run: func(cmd *cobra.Command, args []string) {
 			zaplog := zap.New(zap.UseDevMode(true))
 			ctrl.SetLogger(zaplog)
@@ -76,8 +88,9 @@ func RootCmd() *cobra.Command {
 		},
 	}
 
-	setupCLILog(cmd)
 	addSubcommands(cmd)
+
+	cmd.PersistentFlags().StringVar(&logLevel, "log-level", logrus.InfoLevel.String(), "Log level (debug, info, warn, error, fatal, panic)")
 
 	cmd.Flags().StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	cmd.Flags().StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -88,11 +101,14 @@ func RootCmd() *cobra.Command {
 	return cmd
 }
 
-func setupCLILog(cmd *cobra.Command) {
-	ctx := context.Background()
-	log := MustNewLogger(logrus.InfoLevel)
-	ctx = ctrl.LoggerInto(ctx, log)
+func setupCLILog(cmd *cobra.Command, level logrus.Level) error {
+	log, err := NewLogger(level)
+	if err != nil {
+		return err
+	}
+	ctx := ctrl.LoggerInto(cmd.Context(), log)
 	cmd.SetContext(ctx)
+	return nil
 }
 
 func addSubcommands(cmd *cobra.Command) {

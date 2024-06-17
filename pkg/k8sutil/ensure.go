@@ -27,7 +27,7 @@ func EnsureObject(ctx context.Context, cli client.Client, obj client.Object, sho
 			return fmt.Errorf("get object: %w", err)
 		}
 	} else if shouldDelete(copy) {
-		log.Info("Deleting object...", "object", key.String())
+		log.Info("Deleting previous object...", "object", key.String())
 		err := cli.Delete(ctx, copy)
 		if err != nil {
 			return fmt.Errorf("delete object: %w", err)
@@ -44,7 +44,7 @@ func EnsureObject(ctx context.Context, cli client.Client, obj client.Object, sho
 		if err != nil {
 			return fmt.Errorf("wait for delete: %w", err)
 		}
-		log.Info("Deleted object", "object", key.String())
+		log.Info("Deleted previous object", "object", key.String())
 	} else {
 		// copy the object into the original object since we had to use a copy above.
 		// i could not find a better way to do this.

@@ -43,7 +43,7 @@ func registryAuth(ctx context.Context, log logr.Logger, cli client.Client) (cred
 		if !errors.IsNotFound(err) {
 			return nil, fmt.Errorf("unable to get secret: %w", err)
 		}
-		log.Info("registry-creds secret not found, using anonymous access")
+		log.Info("Secret registry-creds not found, using anonymous access")
 		return credentials.NewMemoryStore(), nil
 	}
 
@@ -71,13 +71,13 @@ func registryAuth(ctx context.Context, log logr.Logger, cli client.Client) (cred
 // directory and the path to this directory is returned. Callers are responsible for removing the temp
 // path when it is no longer needed. In case of error, the temporary directory is removed here.
 func Pull(ctx context.Context, log logr.Logger, cli client.Client, from string) (string, error) {
-	log.Info("reading registry credentials from cluster")
+	log.Info("Reading registry credentials from cluster")
 	store, err := registryAuth(ctx, log, cli)
 	if err != nil {
 		return "", fmt.Errorf("unable to get registry auth: %w", err)
 	}
 
-	log.Info("pulling artifact from registry", "from", from)
+	log.Info("Pulling artifact from registry", "from", from)
 	imgref, err := registry.ParseReference(from)
 	if err != nil {
 		return "", fmt.Errorf("unable to parse image reference: %w", err)
@@ -120,7 +120,7 @@ func Pull(ctx context.Context, log logr.Logger, cli client.Client, from string) 
 	// if we fail to fetch the artifact using https we gonna try once more using plain
 	// http as some versions of the registry were deployed without tls.
 	repo.PlainHTTP = true
-	log.Info("unable to fetch artifact using tls, retrying with http")
+	log.Info("Unable to fetch artifact using tls, retrying with http")
 	if _, err := oras.Copy(ctx, repo, tag, fs, tag, oras.DefaultCopyOptions); err != nil {
 		os.RemoveAll(tmpdir)
 		err = multierr.Combine(tlserr, err)

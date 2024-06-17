@@ -19,6 +19,8 @@ func EnsureObject(ctx context.Context, cli client.Client, obj client.Object, sho
 	log := ctrl.LoggerFrom(ctx)
 
 	key := client.ObjectKeyFromObject(obj)
+	logArgs := []any{"gvk", obj.GetObjectKind().GroupVersionKind().String(), "obj", key.String()}
+
 	// make a copy of the object to avoid modifying the original object if we need to delete it
 	copy := obj.DeepCopyObject().(client.Object)
 	err := cli.Get(ctx, key, copy)
@@ -27,7 +29,7 @@ func EnsureObject(ctx context.Context, cli client.Client, obj client.Object, sho
 			return fmt.Errorf("get object: %w", err)
 		}
 	} else if shouldDelete(copy) {
-		log.Info("Deleting previous object...", "object", key.String())
+		log.Info("Deleting previous object...", logArgs...)
 		err := cli.Delete(ctx, copy)
 		if err != nil {
 			return fmt.Errorf("delete object: %w", err)
@@ -44,7 +46,7 @@ func EnsureObject(ctx context.Context, cli client.Client, obj client.Object, sho
 		if err != nil {
 			return fmt.Errorf("wait for delete: %w", err)
 		}
-		log.Info("Deleted previous object", "object", key.String())
+		log.Info("Deleted previous object", logArgs...)
 	} else {
 		// copy the object into the original object since we had to use a copy above.
 		// i could not find a better way to do this.
@@ -55,12 +57,12 @@ func EnsureObject(ctx context.Context, cli client.Client, obj client.Object, sho
 		return nil
 	}
 
-	log.Info("Creating object...", "object", key.String())
+	log.Info("Creating object...", logArgs...)
 	err = cli.Create(ctx, obj)
 	if err != nil {
 		return fmt.Errorf("create object: %w", err)
 	}
-	log.Info("Created object", "object", key.String())
+	log.Info("Created object", logArgs...)
 	return nil
 }
 

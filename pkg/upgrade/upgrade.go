@@ -296,6 +296,8 @@ func ensureAirgapArtifactsInCluster(ctx context.Context, cli client.Client, in *
 	nsn := types.NamespacedName{Name: "autopilot"}
 	plan := autopilotv1beta2.Plan{}
 
+	log.Info("Waiting for container images to be uploaded...")
+
 	err = wait.PollUntilContextCancel(ctx, 5*time.Second, true, func(ctx context.Context) (bool, error) {
 		err := cli.Get(ctx, nsn, &plan)
 		if err != nil {

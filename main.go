@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/cli"
@@ -26,7 +25,6 @@ import (
 func main() {
 	err := cli.RootCmd().Execute()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "ERROR:", err)
 		os.Exit(1)
 	}
 }

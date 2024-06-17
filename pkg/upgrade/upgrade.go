@@ -244,6 +244,8 @@ func ensureAirgapArtifactsOnNodes(ctx context.Context, cli client.Client, in *cl
 		return fmt.Errorf("ensure artifacts job for nodes: %w", err)
 	}
 
+	log.Info("Waiting for artifacts to be placed on nodes...")
+
 	err = wait.PollUntilContextCancel(ctx, 5*time.Second, true, func(ctx context.Context) (bool, error) {
 		jobs, err := artifacts.ListArtifactsJobForNodes(ctx, cli, in)
 		if err != nil {

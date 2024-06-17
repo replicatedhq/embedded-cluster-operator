@@ -430,7 +430,7 @@ func (r *InstallationReconciler) ReconcileK0sVersion(ctx context.Context, in *v1
 			in.Status.SetState(v1beta1.InstallationStateFailed, reason, nil)
 			return nil
 		}
-		log.Info("Using local-artifact-mirror-image", "image", image)
+		log.Info("Using local-artifact-mirror image", "image", image)
 
 		// in airgap installations let's make sure all assets have been copied to nodes.
 		// this may take some time so we only move forward when 'ready'.

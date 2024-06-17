@@ -13,11 +13,3 @@ func NewLogger(level logrus.Level) (logr.Logger, error) {
 	log := logrusr.New(logrusLog)
 	return log, nil
 }
-
-func MustNewLogger(level logrus.Level) logr.Logger {
-	log, err := NewLogger(level)
-	if err != nil {
-		panic(err)
-	}
-	return log
-}

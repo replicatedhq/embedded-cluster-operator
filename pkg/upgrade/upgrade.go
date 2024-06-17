@@ -160,7 +160,7 @@ func patchClusterConfigOperatorChart(ctx context.Context, cli client.Client, clu
 		return nil
 	}
 
-	fmt.Printf("Patching K0s cluster config with merge patch: %s\n", string(patchData))
+	log.V(2).Info("Patching K0s cluster config with merge patch", "patch", string(patchData))
 
 	patch := client.RawPatch(types.MergePatchType, patchData)
 	err = cli.Patch(ctx, clusterConfig, patch)

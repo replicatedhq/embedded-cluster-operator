@@ -331,8 +331,10 @@ func autopilotEnsureAirgapArtifactsPlan(ctx context.Context, cli client.Client, 
 		return fmt.Errorf("get autopilot airgap artifacts plan: %w", err)
 	}
 
-	err = k8sutil.EnsureObject(ctx, cli, plan, func(obj client.Object) bool {
-		return obj.GetAnnotations()[installationNameAnnotation] != in.Name
+	err = k8sutil.EnsureObject(ctx, cli, plan, func(opts *k8sutil.EnsureObjectOptions) {
+		opts.ShouldDelete = func(obj client.Object) bool {
+			return obj.GetAnnotations()[installationNameAnnotation] != in.Name
+		}
 	})
 	if err != nil {
 		return fmt.Errorf("ensure autopilot plan: %w", err)

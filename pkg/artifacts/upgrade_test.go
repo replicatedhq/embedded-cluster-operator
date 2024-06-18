@@ -221,3 +221,157 @@ func TestEnsureArtifactsJobForNodes(t *testing.T) {
 		})
 	}
 }
+
+func TestListArtifactsJobForNodes(t *testing.T) {
+	in := &clusterv1beta1.Installation{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-installation",
+		},
+		Spec: clusterv1beta1.InstallationSpec{
+			Artifacts: &clusterv1beta1.ArtifactsLocation{
+				Images:                  "images",
+				HelmCharts:              "helm-charts",
+				EmbeddedClusterBinary:   "embedded-cluster-binary",
+				EmbeddedClusterMetadata: "embedded-cluster-metadata",
+			},
+		},
+	}
+
+	type args struct {
+		in *clusterv1beta1.Installation
+	}
+	tests := []struct {
+		name            string
+		initRuntimeObjs []client.Object
+		args            args
+		wantErr         bool
+		assertWant      func(t *testing.T, in *clusterv1beta1.Installation, want map[string]*batchv1.Job)
+	}{
+		{
+			name: "list artifacts job",
+			initRuntimeObjs: []client.Object{
+				&corev1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node1",
+					},
+				},
+				&corev1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node2",
+					},
+				},
+				&corev1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node3",
+					},
+				},
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: ecNamespace,
+					},
+				},
+				&batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: ecNamespace,
+						Name:      copyArtifactsJobPrefix + "node1",
+						Annotations: map[string]string{
+							InstallationNameAnnotation: "test-installation",
+							ArtifactsConfigHashAnnotation: func() string {
+								artifactsHash, err := HashForAirgapConfig(in)
+								require.NoError(t, err)
+								return artifactsHash
+							}(),
+						},
+					},
+					Spec: batchv1.JobSpec{
+						Template: corev1.PodTemplateSpec{
+							Spec: corev1.PodSpec{
+								RestartPolicy: corev1.RestartPolicyNever,
+								Containers: []corev1.Container{
+									{
+										Name:  "copy-artifacts",
+										Image: "image",
+									},
+								},
+							},
+						},
+					},
+				},
+				&batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: ecNamespace,
+						Name:      copyArtifactsJobPrefix + "node2",
+						Annotations: map[string]string{
+							InstallationNameAnnotation:    "test-installation",
+							ArtifactsConfigHashAnnotation: "old-hash",
+						},
+					},
+					Spec: batchv1.JobSpec{
+						Template: corev1.PodTemplateSpec{
+							Spec: corev1.PodSpec{
+								RestartPolicy: corev1.RestartPolicyNever,
+								Containers: []corev1.Container{
+									{
+										Name:  "copy-artifacts",
+										Image: "image",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				in: in,
+			},
+			wantErr: false,
+			assertWant: func(t *testing.T, in *clusterv1beta1.Installation, want map[string]*batchv1.Job) {
+				artifactsHash, err := HashForAirgapConfig(in)
+				require.NoError(t, err)
+
+				assert.Len(t, want, 3)
+
+				job := want["node1"]
+				assert.Equal(t, "test-installation", job.ObjectMeta.Annotations[InstallationNameAnnotation])
+				assert.Equal(t, artifactsHash, job.ObjectMeta.Annotations[ArtifactsConfigHashAnnotation])
+
+				// old hash
+				job = want["node2"]
+				assert.Nil(t, job)
+
+				// missing
+				job = want["node3"]
+				assert.Nil(t, job)
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			log := testr.NewWithOptions(t, testr.Options{Verbosity: 10})
+			ctx := logr.NewContext(context.Background(), log)
+
+			testEnv := &envtest.Environment{}
+			cfg, err := testEnv.Start()
+			require.NoError(t, err)
+			t.Cleanup(func() { _ = testEnv.Stop() })
+
+			cli, err := client.New(cfg, client.Options{Scheme: k8sutil.Scheme()})
+			require.NoError(t, err)
+
+			for _, obj := range tt.initRuntimeObjs {
+				err := cli.Create(ctx, obj)
+				require.NoError(t, err)
+			}
+
+			got, err := ListArtifactsJobForNodes(ctx, cli, tt.args.in)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ListArtifactsJobForNodes() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if tt.assertWant != nil {
+				tt.assertWant(t, tt.args.in, got)
+			}
+		})
+	}
+}

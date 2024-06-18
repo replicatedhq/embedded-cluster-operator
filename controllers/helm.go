@@ -214,13 +214,11 @@ func updateInfraChartsFromInstall(ctx context.Context, in *v1beta1.Installation,
 					},
 				}
 
-				log.Info("setting extraEnv for velero", "extraEnv", extraEnvVars)
 				newVals, err := setHelmValue(chart.Values, "configuration", extraEnvVars)
 				if err != nil {
 					log.Error(err, "failed to set helm values extraEnvVars", "chart", chart.Name)
 					continue
 				}
-				log.Info("new values", "newVals", newVals)
 				charts[i].Values = newVals
 			}
 		}

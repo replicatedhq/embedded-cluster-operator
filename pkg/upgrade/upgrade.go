@@ -19,7 +19,6 @@ import (
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/release"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -33,8 +32,16 @@ const (
 	clusterConfigNamespace = "kube-system"
 )
 
+// Upgrade upgrades the embedded cluster to the version specified in the installation. If the
+// installation is airgapped, the artifacts are copied to the nodes and the autopilot plan is
+// created to copy the images to the cluster. The operator chart is updated to the  version
+// specified in the installation. This will update the CRDs and operator. The installation is then
+// created and the operator will resume the upgrade process.
 func Upgrade(ctx context.Context, cli client.Client, in *clusterv1beta1.Installation, localArtifactMirrorImage string) error {
 	if in.Spec.AirGap {
+		// in airgap installations we need to copy the artifacts to the nodes and then autopilot
+		// will copy the images to the cluster so we can start the new operator.
+
 		err := metadata.CopyVersionMetadataToCluster(ctx, cli, in)
 		if err != nil {
 			return fmt.Errorf("copy version metadata to cluster: %w", err)
@@ -46,35 +53,31 @@ func Upgrade(ctx context.Context, cli client.Client, in *clusterv1beta1.Installa
 		}
 	}
 
+	// update the operator chart prior to creating the installation to update the crd
+
 	err := applyOperatorChart(ctx, cli, in)
 	if err != nil {
 		return fmt.Errorf("apply operator chart: %w", err)
 	}
 
-	// do not apply the installation if the operator chart is not up-to-date and thus the crd is
-	// not up-to-date
-
-	err = applyInstallation(ctx, cli, in)
+	err = createInstallation(ctx, cli, in)
 	if err != nil {
 		return fmt.Errorf("apply installation: %w", err)
 	}
 
+	// once the new operator is running, it will take care of the rest of the upgrade
+
 	return nil
 }
 
-func applyInstallation(ctx context.Context, cli client.Client, in *clusterv1beta1.Installation) error {
+func createInstallation(ctx context.Context, cli client.Client, in *clusterv1beta1.Installation) error {
 	log := ctrl.LoggerFrom(ctx)
-
-	err := cli.Get(ctx, client.ObjectKeyFromObject(in), &clusterv1beta1.Installation{})
-	if err == nil {
-		return nil
-	} else if !k8serrors.IsNotFound(err) {
-		return fmt.Errorf("get installation: %w", err)
-	}
 
 	log.Info("Creating installation...")
 
-	err = cli.Create(ctx, in)
+	// the installation always has a unique name (current timestamp), so we can just create it
+
+	err := cli.Create(ctx, in)
 	if err != nil {
 		return fmt.Errorf("create installation: %w", err)
 	}

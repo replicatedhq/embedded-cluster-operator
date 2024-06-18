@@ -224,8 +224,8 @@ func airgapDistributeArtifacts(ctx context.Context, cli client.Client, in *clust
 		return fmt.Errorf("ensure airgap artifacts: %w", err)
 	}
 
-	// once all assets are in place we can create the autopilot plan to push the images to the
-	// local registry.
+	// once all assets are in place we can create the autopilot plan to push the images to
+	// containerd.
 	err = ensureAirgapArtifactsInCluster(ctx, cli, in)
 	if err != nil {
 		return fmt.Errorf("autopilot copy airgap artifacts: %w", err)

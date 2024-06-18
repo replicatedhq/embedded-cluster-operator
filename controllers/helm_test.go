@@ -1451,7 +1451,7 @@ func Test_updateInfraChartsFromInstall(t *testing.T) {
 			want: []k0sv1beta1.Chart{
 				{
 					Name:   "velero",
-					Values: "abc: xyz\nconfiguration:\n  extraEnvVars:\n  - name: HTTP_PROXY\n    value: http://proxy\n  - name: HTTPS_PROXY\n    value: https://proxy\n  - name: NO_PROXY\n    value: noproxy\n",
+					Values: "abc: xyz\nconfiguration:\n  extraEnvVars:\n    HTTP_PROXY: http://proxy\n    HTTPS_PROXY: https://proxy\n    NO_PROXY: noproxy\n",
 				},
 			},
 		},

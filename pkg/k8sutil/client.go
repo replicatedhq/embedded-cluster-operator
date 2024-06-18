@@ -13,26 +13,26 @@ import (
 	embeddedclusterv1beta1 "github.com/replicatedhq/embedded-cluster-kinds/apis/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
 var (
-	scheme = runtime.NewScheme()
+	newScheme = runtime.NewScheme()
 )
 
 func init() {
-	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(scheme.AddToScheme(newScheme))
 
-	utilruntime.Must(embeddedclusterv1beta1.AddToScheme(scheme))
-	utilruntime.Must(autopilotv1beta2.AddToScheme(scheme))
-	utilruntime.Must(k0sv1beta1.AddToScheme(scheme))
-	utilruntime.Must(k0shelm.AddToScheme(scheme))
+	utilruntime.Must(embeddedclusterv1beta1.AddToScheme(newScheme))
+	utilruntime.Must(autopilotv1beta2.AddToScheme(newScheme))
+	utilruntime.Must(k0sv1beta1.AddToScheme(newScheme))
+	utilruntime.Must(k0shelm.AddToScheme(newScheme))
 }
 
 func Scheme() *runtime.Scheme {
-	return scheme
+	return newScheme
 }
 
 // KubeClient returns a new kubernetes client.
@@ -41,5 +41,5 @@ func KubeClient() (client.Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to process kubernetes config: %w", err)
 	}
-	return client.New(cfg, client.Options{Scheme: scheme})
+	return client.New(cfg, client.Options{Scheme: newScheme})
 }

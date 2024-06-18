@@ -25,6 +25,11 @@ import (
 const ecNamespace = "embedded-cluster"
 const copyArtifactsJobPrefix = "copy-artifacts-"
 
+const (
+	InstallationNameAnnotation    = "embedded-cluster.replicated.com/installation-name"
+	ArtifactsConfigHashAnnotation = "embedded-cluster.replicated.com/artifacts-config-hash"
+)
+
 // copyArtifactsJob is a job we create everytime we need to sync files into all nodes.
 // This job mounts /var/lib/embedded-cluster from the node and uses binaries that are
 // present there. This is not yet a complete version of the job as it misses some env
@@ -140,9 +145,9 @@ func ListArtifactsJobForNodes(ctx context.Context, cli client.Client, in *cluste
 			// we need to check if the job is for the given installation otherwise we delete
 			// it. we also need to check if the configuration has changed. this will trigger
 			// a new reconcile cycle.
-			labels := job.GetLabels()
-			oldjob := labels["embedded-cluster/installation"] != in.Name
-			newcfg := labels["embedded-cluster/artifacts-config-hash"] != cfghash
+			annotations := job.GetAnnotations()
+			oldjob := annotations[InstallationNameAnnotation] != in.Name
+			newcfg := annotations[ArtifactsConfigHashAnnotation] != cfghash
 			if !oldjob && !newcfg {
 				jobs[node.Name] = job
 				continue
@@ -168,20 +173,28 @@ func HashForAirgapConfig(in *clusterv1beta1.Installation) (string, error) {
 	return hash[:10], nil
 }
 
+var (
+	// used for testing
+	ensureArtifactsJobForNodeDeletePropagation = metav1.DeletePropagationForeground
+)
+
 func ensureArtifactsJobForNode(ctx context.Context, cli client.Client, in *clusterv1beta1.Installation, node corev1.Node, localArtifactMirrorImage, cfghash string) (*batchv1.Job, error) {
 	job, err := getArtifactJobForNode(ctx, cli, in, node, localArtifactMirrorImage)
 	if err != nil {
 		return nil, fmt.Errorf("get job for node: %w", err)
 	}
 
-	err = k8sutil.EnsureObject(ctx, cli, job, func(obj client.Object) bool {
-		// we need to check if the job is for the given installation otherwise we delete
-		// it. we also need to check if the configuration has changed. this will trigger
-		// a new reconcile cycle.
-		labels := obj.GetLabels()
-		oldjob := labels["embedded-cluster/installation"] != in.Name
-		newcfg := labels["embedded-cluster/artifacts-config-hash"] != cfghash
-		return oldjob || newcfg
+	err = k8sutil.EnsureObject(ctx, cli, job, func(opts *k8sutil.EnsureObjectOptions) {
+		opts.DeleteOptions = append(opts.DeleteOptions, client.PropagationPolicy(ensureArtifactsJobForNodeDeletePropagation))
+		opts.ShouldDelete = func(obj client.Object) bool {
+			// we need to check if the job is for the given installation otherwise we delete
+			// it. we also need to check if the configuration has changed. this will trigger
+			// a new reconcile cycle.
+			annotations := obj.GetAnnotations()
+			oldjob := annotations[InstallationNameAnnotation] != in.Name
+			newcfg := annotations[ArtifactsConfigHashAnnotation] != cfghash
+			return oldjob || newcfg
+		}
 	})
 	if err != nil {
 		return nil, fmt.Errorf("ensure object: %w", err)
@@ -204,7 +217,7 @@ func getArtifactJobForNode(ctx context.Context, cli client.Client, in *clusterv1
 
 	job := copyArtifactsJob.DeepCopy()
 	job.Name = util.NameWithLengthLimit(copyArtifactsJobPrefix, node.Name)
-	job.Labels = applyArtifactsJobLabels(job.Labels, in, hash)
+	job.Annotations = applyArtifactsJobAnnotations(job.GetAnnotations(), in, hash)
 	job.Spec.Template.Spec.NodeName = node.Name
 	job.Spec.Template.Spec.Containers[0].Env = append(
 		job.Spec.Template.Spec.Containers[0].Env,
@@ -263,11 +276,11 @@ func CreateAutopilotAirgapPlanCommand(ctx context.Context, cli client.Client, in
 	}, nil
 }
 
-func applyArtifactsJobLabels(labels map[string]string, in *clusterv1beta1.Installation, hash string) map[string]string {
-	if labels == nil {
-		labels = make(map[string]string)
+func applyArtifactsJobAnnotations(annotations map[string]string, in *clusterv1beta1.Installation, hash string) map[string]string {
+	if annotations == nil {
+		annotations = make(map[string]string)
 	}
-	labels["embedded-cluster/installation"] = in.Name
-	labels["embedded-cluster/artifacts-config-hash"] = hash
-	return labels
+	annotations[InstallationNameAnnotation] = in.Name
+	annotations[ArtifactsConfigHashAnnotation] = hash
+	return annotations
 }

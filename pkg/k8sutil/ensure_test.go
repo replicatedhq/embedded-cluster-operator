@@ -4,19 +4,20 @@ import (
 	"context"
 	"testing"
 
+	"github.com/go-logr/logr"
+	"github.com/go-logr/logr/testr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 )
 
 func TestEnsureObject(t *testing.T) {
 	type args struct {
-		obj          client.Object
-		shouldDelete func(obj client.Object) bool
+		obj       client.Object
+		applyOpts []func(*EnsureObjectOptions)
 	}
 	tests := []struct {
 		name            string
@@ -50,9 +51,6 @@ func TestEnsureObject(t *testing.T) {
 							},
 						},
 					},
-				},
-				shouldDelete: func(obj client.Object) bool {
-					return false
 				},
 			},
 			wantErr: false,
@@ -104,9 +102,6 @@ func TestEnsureObject(t *testing.T) {
 						},
 					},
 				},
-				shouldDelete: func(obj client.Object) bool {
-					return false
-				},
 			},
 			wantErr: false,
 			assertObj: func(t *testing.T, obj client.Object) {
@@ -157,8 +152,10 @@ func TestEnsureObject(t *testing.T) {
 						},
 					},
 				},
-				shouldDelete: func(obj client.Object) bool {
-					return true
+				applyOpts: []func(*EnsureObjectOptions){
+					func(opts *EnsureObjectOptions) {
+						opts.ShouldDelete = func(obj client.Object) bool { return true }
+					},
 				},
 			},
 			wantErr: false,
@@ -172,20 +169,23 @@ func TestEnsureObject(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			log := testr.NewWithOptions(t, testr.Options{Verbosity: 10})
+			ctx := logr.NewContext(context.Background(), log)
+
 			testEnv := &envtest.Environment{}
 			cfg, err := testEnv.Start()
 			require.NoError(t, err)
 			t.Cleanup(func() { _ = testEnv.Stop() })
 
-			cli, err := client.New(cfg, client.Options{Scheme: scheme.Scheme})
+			cli, err := client.New(cfg, client.Options{Scheme: Scheme()})
 			require.NoError(t, err)
 
 			for _, obj := range tt.initRuntimeObjs {
-				err := cli.Create(context.Background(), obj)
+				err := cli.Create(ctx, obj)
 				require.NoError(t, err)
 			}
 
-			if err := EnsureObject(context.Background(), cli, tt.args.obj, tt.args.shouldDelete); (err != nil) != tt.wantErr {
+			if err := EnsureObject(ctx, cli, tt.args.obj, tt.args.applyOpts...); (err != nil) != tt.wantErr {
 				t.Errorf("EnsureObject() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if tt.assertObj != nil {

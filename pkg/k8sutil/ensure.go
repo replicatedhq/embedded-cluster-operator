@@ -15,7 +15,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func EnsureObject(ctx context.Context, cli client.Client, obj client.Object, shouldDelete func(obj client.Object) bool) error {
+type EnsureObjectOptions struct {
+	DeleteOptions []client.DeleteOption
+	ShouldDelete  func(obj client.Object) bool
+}
+
+func EnsureObject(ctx context.Context, cli client.Client, obj client.Object, applyOpts ...func(*EnsureObjectOptions)) error {
+	opts := &EnsureObjectOptions{}
+	for _, apply := range applyOpts {
+		apply(opts)
+	}
+
 	log := ctrl.LoggerFrom(ctx)
 
 	key := client.ObjectKeyFromObject(obj)
@@ -28,9 +38,9 @@ func EnsureObject(ctx context.Context, cli client.Client, obj client.Object, sho
 		if !errors.IsNotFound(err) {
 			return fmt.Errorf("get object: %w", err)
 		}
-	} else if shouldDelete(copy) {
+	} else if opts.ShouldDelete != nil && opts.ShouldDelete(copy) {
 		log.Info("Deleting previous object...", logArgs...)
-		err := cli.Delete(ctx, copy)
+		err := cli.Delete(ctx, copy, opts.DeleteOptions...)
 		if err != nil {
 			return fmt.Errorf("delete object: %w", err)
 		}
@@ -41,6 +51,7 @@ func EnsureObject(ctx context.Context, cli client.Client, obj client.Object, sho
 			} else if err != nil {
 				return false, fmt.Errorf("get object: %w", err)
 			}
+			log.V(5).Info("Object still exists...", logArgs...)
 			return false, nil
 		})
 		if err != nil {

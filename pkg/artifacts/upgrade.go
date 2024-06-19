@@ -173,11 +173,6 @@ func HashForAirgapConfig(in *clusterv1beta1.Installation) (string, error) {
 	return hash[:10], nil
 }
 
-var (
-	// used for testing
-	ensureArtifactsJobForNodeDeletePropagation = metav1.DeletePropagationForeground
-)
-
 func ensureArtifactsJobForNode(ctx context.Context, cli client.Client, in *clusterv1beta1.Installation, node corev1.Node, localArtifactMirrorImage, cfghash string) (*batchv1.Job, error) {
 	job, err := getArtifactJobForNode(ctx, cli, in, node, localArtifactMirrorImage)
 	if err != nil {
@@ -185,7 +180,7 @@ func ensureArtifactsJobForNode(ctx context.Context, cli client.Client, in *clust
 	}
 
 	err = k8sutil.EnsureObject(ctx, cli, job, func(opts *k8sutil.EnsureObjectOptions) {
-		opts.DeleteOptions = append(opts.DeleteOptions, client.PropagationPolicy(ensureArtifactsJobForNodeDeletePropagation))
+		opts.DeleteOptions = append(opts.DeleteOptions, client.PropagationPolicy(metav1.DeletePropagationForeground))
 		opts.ShouldDelete = func(obj client.Object) bool {
 			// we need to check if the job is for the given installation otherwise we delete
 			// it. we also need to check if the configuration has changed. this will trigger

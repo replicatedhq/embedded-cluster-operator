@@ -2,7 +2,9 @@ package artifacts
 
 import (
 	"context"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/go-logr/logr/testr"
@@ -18,6 +20,31 @@ import (
 )
 
 func TestEnsureArtifactsJobForNodes(t *testing.T) {
+	removeJobFinalizers := func(ctx context.Context, t *testing.T, cli client.Client, in *clusterv1beta1.Installation) {
+		for timer := time.NewTimer(1 * time.Second); ; timer = time.NewTimer(1 * time.Second) {
+			select {
+			case <-timer.C:
+			case <-ctx.Done():
+				return
+			}
+
+			list := &batchv1.JobList{}
+			err := cli.List(ctx, list, client.InNamespace(ecNamespace))
+			if err != nil {
+				require.NoError(t, err)
+			}
+			for _, item := range list.Items {
+				if item.GetFinalizers() != nil {
+					// there is no job controller in envtest so the finalizer will not be
+					// removed and the job will not be deleted
+					item.SetFinalizers(nil)
+					err := cli.Update(ctx, &item)
+					require.NoError(t, err)
+				}
+			}
+		}
+	}
+
 	type args struct {
 		in                       *clusterv1beta1.Installation
 		localArtifactMirrorImage string
@@ -25,6 +52,7 @@ func TestEnsureArtifactsJobForNodes(t *testing.T) {
 	tests := []struct {
 		name            string
 		initRuntimeObjs []client.Object
+		modifyRuntime   func(ctx context.Context, t *testing.T, cli client.Client, in *clusterv1beta1.Installation)
 		args            args
 		wantErr         bool
 		assertRuntime   func(t *testing.T, cli client.Client, in *clusterv1beta1.Installation)
@@ -167,7 +195,8 @@ func TestEnsureArtifactsJobForNodes(t *testing.T) {
 				},
 				localArtifactMirrorImage: "local-artifact-mirror",
 			},
-			wantErr: false,
+			modifyRuntime: removeJobFinalizers,
+			wantErr:       false,
 			assertRuntime: func(t *testing.T, cli client.Client, in *clusterv1beta1.Installation) {
 				artifactsHash, err := HashForAirgapConfig(in)
 				require.NoError(t, err)
@@ -192,8 +221,11 @@ func TestEnsureArtifactsJobForNodes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			log := testr.NewWithOptions(t, testr.Options{Verbosity: 10})
-			ctx := logr.NewContext(context.Background(), log)
+			ctx = logr.NewContext(ctx, log)
 
 			testEnv := &envtest.Environment{}
 			cfg, err := testEnv.Start()
@@ -208,9 +240,14 @@ func TestEnsureArtifactsJobForNodes(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			// there is no job controller in envtest so the finalizer will not be removed
-			ensureArtifactsJobForNodeDeletePropagation = metav1.DeletePropagationBackground
-			t.Cleanup(func() { ensureArtifactsJobForNodeDeletePropagation = metav1.DeletePropagationForeground })
+			wg := sync.WaitGroup{}
+			if tt.modifyRuntime != nil {
+				wg.Add(1)
+				go func() {
+					tt.modifyRuntime(ctx, t, cli, tt.args.in)
+					wg.Done()
+				}()
+			}
 
 			if err := EnsureArtifactsJobForNodes(ctx, cli, tt.args.in, tt.args.localArtifactMirrorImage); (err != nil) != tt.wantErr {
 				t.Errorf("EnsureArtifactsJobForNodes() error = %v, wantErr %v", err, tt.wantErr)
@@ -218,6 +255,10 @@ func TestEnsureArtifactsJobForNodes(t *testing.T) {
 			}
 
 			tt.assertRuntime(t, cli, tt.args.in)
+
+			cancel()
+
+			wg.Wait()
 		})
 	}
 }

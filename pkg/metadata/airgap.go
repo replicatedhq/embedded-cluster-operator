@@ -46,7 +46,7 @@ func CopyVersionMetadataToCluster(ctx context.Context, cli client.Client, in *v1
 	}
 	defer os.RemoveAll(location)
 
-	// now that we have the metadata locally we can reads its information and create the config map.
+	// now that we have the metadata locally we can read its information and create the config map.
 	fpath := filepath.Join(location, "version-metadata.json")
 	data, err := os.ReadFile(fpath)
 	if err != nil {

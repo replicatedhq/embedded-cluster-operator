@@ -1,0 +1,438 @@
+{
+  "description": "Installation is the Schema for the installations API",
+  "type": "object",
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "InstallationSpec defines the desired state of Installation.",
+      "type": "object",
+      "properties": {
+        "airGap": {
+          "description": "AirGap indicates if the installation is airgapped.",
+          "type": "boolean"
+        },
+        "artifacts": {
+          "description": "Artifacts holds the location of the airgap bundle.",
+          "type": "object",
+          "required": [
+            "embeddedClusterBinary",
+            "embeddedClusterMetadata",
+            "helmCharts",
+            "images"
+          ],
+          "properties": {
+            "additionalArtifacts": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "embeddedClusterBinary": {
+              "type": "string"
+            },
+            "embeddedClusterMetadata": {
+              "type": "string"
+            },
+            "helmCharts": {
+              "type": "string"
+            },
+            "images": {
+              "type": "string"
+            }
+          }
+        },
+        "binaryName": {
+          "description": "BinaryName holds the name of the binary used to install the cluster.\nthis will follow the pattern 'appslug-channelslug'",
+          "type": "string"
+        },
+        "clusterID": {
+          "description": "ClusterID holds the cluster, generated during the installation.",
+          "type": "string"
+        },
+        "config": {
+          "description": "Config holds the configuration used at installation time.",
+          "type": "object",
+          "properties": {
+            "extensions": {
+              "type": "object",
+              "properties": {
+                "helm": {
+                  "description": "HelmExtensions specifies settings for cluster helm based extensions",
+                  "type": "object",
+                  "properties": {
+                    "charts": {
+                      "description": "ChartsSettings charts settings",
+                      "type": "array",
+                      "items": {
+                        "description": "Chart single helm addon",
+                        "type": "object",
+                        "properties": {
+                          "chartname": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "namespace": {
+                            "type": "string"
+                          },
+                          "order": {
+                            "type": "integer"
+                          },
+                          "timeout": {
+                            "description": "A Duration represents the elapsed time between two instants\nas an int64 nanosecond count. The representation limits the\nlargest representable duration to approximately 290 years.",
+                            "type": "integer",
+                            "format": "int64"
+                          },
+                          "values": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "concurrencyLevel": {
+                      "type": "integer"
+                    },
+                    "repositories": {
+                      "description": "RepositoriesSettings repository settings",
+                      "type": "array",
+                      "items": {
+                        "description": "Repository describes single repository entry. Fields map to the CLI flags for the \"helm add\" command",
+                        "type": "object",
+                        "properties": {
+                          "caFile": {
+                            "type": "string"
+                          },
+                          "certFile": {
+                            "type": "string"
+                          },
+                          "insecure": {
+                            "type": "boolean"
+                          },
+                          "keyfile": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "password": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string"
+                          },
+                          "username": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "roles": {
+              "description": "Roles is the various roles in the cluster.",
+              "type": "object",
+              "properties": {
+                "controller": {
+                  "description": "NodeRole is the role of a node in the cluster.",
+                  "type": "object",
+                  "properties": {
+                    "description": {
+                      "type": "string"
+                    },
+                    "labels": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "nodeCount": {
+                      "description": "NodeCount holds a series of rules for a given node role.",
+                      "type": "object",
+                      "properties": {
+                        "range": {
+                          "description": "NodeRange contains a min and max or only one of them (conflicts\nwith Values).",
+                          "type": "object",
+                          "properties": {
+                            "max": {
+                              "description": "Max is the maximum number of nodes.",
+                              "type": "integer"
+                            },
+                            "min": {
+                              "description": "Min is the minimum number of nodes.",
+                              "type": "integer"
+                            }
+                          }
+                        },
+                        "values": {
+                          "description": "Values holds a list of allowed node counts.",
+                          "type": "array",
+                          "items": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "custom": {
+                  "type": "array",
+                  "items": {
+                    "description": "NodeRole is the role of a node in the cluster.",
+                    "type": "object",
+                    "properties": {
+                      "description": {
+                        "type": "string"
+                      },
+                      "labels": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "string"
+                        }
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "nodeCount": {
+                        "description": "NodeCount holds a series of rules for a given node role.",
+                        "type": "object",
+                        "properties": {
+                          "range": {
+                            "description": "NodeRange contains a min and max or only one of them (conflicts\nwith Values).",
+                            "type": "object",
+                            "properties": {
+                              "max": {
+                                "description": "Max is the maximum number of nodes.",
+                                "type": "integer"
+                              },
+                              "min": {
+                                "description": "Min is the minimum number of nodes.",
+                                "type": "integer"
+                              }
+                            }
+                          },
+                          "values": {
+                            "description": "Values holds a list of allowed node counts.",
+                            "type": "array",
+                            "items": {
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "unsupportedOverrides": {
+              "description": "UnsupportedOverrides holds the config overrides used to configure\nthe cluster.",
+              "type": "object",
+              "properties": {
+                "builtInExtensions": {
+                  "description": "BuiltInExtensions holds overrides for the default add-ons we ship\nwith Embedded Cluster.",
+                  "type": "array",
+                  "items": {
+                    "description": "BuiltInExtension holds the override for a built-in extension (add-on).",
+                    "type": "object",
+                    "required": [
+                      "name",
+                      "values"
+                    ],
+                    "properties": {
+                      "name": {
+                        "description": "The name of the helm chart to override values of, for instance `openebs`.",
+                        "type": "string"
+                      },
+                      "values": {
+                        "description": "YAML-formatted helm values that will override those provided to the\nchart by Embedded Cluster. Properties are overridden individually -\nsetting a new value for `images.tag` here will not prevent Embedded\nCluster from setting `images.pullPolicy = IfNotPresent`, for example.",
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "k0s": {
+                  "description": "K0s holds the overrides used to configure k0s. These overrides\nare merged on top of the default k0s configuration. As the data\nlayout inside this configuration is very dynamic we have chosen\nto use a string here.",
+                  "type": "string"
+                }
+              }
+            },
+            "version": {
+              "type": "string"
+            }
+          }
+        },
+        "configSecret": {
+          "description": "ConfigSecret holds a secret name and namespace. If this is set it means that\nthe Config for this Installation object must be read from there. This option\nsuperseeds (overrides) the Config field.",
+          "type": "object",
+          "required": [
+            "name",
+            "namespace"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "namespace": {
+              "type": "string"
+            }
+          }
+        },
+        "endUserK0sConfigOverrides": {
+          "description": "EndUserK0sConfigOverrides holds the end user k0s config overrides\nused at installation time.",
+          "type": "string"
+        },
+        "highAvailability": {
+          "description": "HighAvailability indicates if the installation is high availability.",
+          "type": "boolean"
+        },
+        "licenseInfo": {
+          "description": "LicenseInfo holds information about the license used to install the cluster.",
+          "type": "object",
+          "properties": {
+            "isDisasterRecoverySupported": {
+              "type": "boolean"
+            }
+          }
+        },
+        "metricsBaseURL": {
+          "description": "MetricsBaseURL holds the base URL for the metrics server.",
+          "type": "string"
+        },
+        "proxy": {
+          "description": "Proxy holds the proxy configuration.",
+          "type": "object",
+          "properties": {
+            "httpProxy": {
+              "type": "string"
+            },
+            "httpsProxy": {
+              "type": "string"
+            },
+            "noProxy": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "status": {
+      "description": "InstallationStatus defines the observed state of Installation",
+      "type": "object",
+      "properties": {
+        "conditions": {
+          "description": "Conditions is an array of current observed installation conditions.",
+          "type": "array",
+          "items": {
+            "description": "Condition contains details for one aspect of the current state of this API Resource.\n---\nThis struct is intended for direct use as an array at the field path .status.conditions.  For example,\n\n\n\ttype FooStatus struct{\n\t    // Represents the observations of a foo's current state.\n\t    // Known .status.conditions.type are: \"Available\", \"Progressing\", and \"Degraded\"\n\t    // +patchMergeKey=type\n\t    // +patchStrategy=merge\n\t    // +listType=map\n\t    // +listMapKey=type\n\t    Conditions []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`\n\n\n\t    // other fields\n\t}",
+            "type": "object",
+            "required": [
+              "lastTransitionTime",
+              "message",
+              "reason",
+              "status",
+              "type"
+            ],
+            "properties": {
+              "lastTransitionTime": {
+                "description": "lastTransitionTime is the last time the condition transitioned from one status to another.\nThis should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
+                "type": "string",
+                "format": "date-time"
+              },
+              "message": {
+                "description": "message is a human readable message indicating details about the transition.\nThis may be an empty string.",
+                "type": "string",
+                "maxLength": 32768
+              },
+              "observedGeneration": {
+                "description": "observedGeneration represents the .metadata.generation that the condition was set based upon.\nFor instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date\nwith respect to the current state of the instance.",
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "reason": {
+                "description": "reason contains a programmatic identifier indicating the reason for the condition's last transition.\nProducers of specific condition types may define expected values and meanings for this field,\nand whether the values are considered a guaranteed API.\nThe value should be a CamelCase string.\nThis field may not be empty.",
+                "type": "string",
+                "maxLength": 1024,
+                "minLength": 1,
+                "pattern": "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$"
+              },
+              "status": {
+                "description": "status of the condition, one of True, False, Unknown.",
+                "type": "string",
+                "enum": [
+                  "True",
+                  "False",
+                  "Unknown"
+                ]
+              },
+              "type": {
+                "description": "type of condition in CamelCase or in foo.example.com/CamelCase.\n---\nMany .condition.type values are consistent across resources like Available, but because arbitrary conditions can be\nuseful (see .node.status.conditions), the ability to deconflict is important.\nThe regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)",
+                "type": "string",
+                "maxLength": 316,
+                "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$"
+              }
+            }
+          },
+          "x-kubernetes-list-map-keys": [
+            "type"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
+        "nodesStatus": {
+          "description": "NodesStatus is a list of nodes and their status.",
+          "type": "array",
+          "items": {
+            "description": "NodeStatus is used to keep track of the status of a cluster node, we\nonly hold its name and a hash of the node's status. Whenever the node\nstatus change we will be able to capture it and update the hash.",
+            "type": "object",
+            "required": [
+              "hash",
+              "name"
+            ],
+            "properties": {
+              "hash": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "pendingCharts": {
+          "description": "PendingCharts holds the list of charts that are being created or updated.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "reason": {
+          "description": "Reason holds the reason for the current state.",
+          "type": "string"
+        },
+        "state": {
+          "description": "State holds the current state of the installation.",
+          "type": "string"
+        }
+      }
+    }
+  }
+}

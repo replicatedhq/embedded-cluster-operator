@@ -200,9 +200,11 @@ $(KUSTOMIZE): $(LOCALBIN)
 .PHONY: controller-gen
 controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary. If wrong version is installed, it will be overwritten.
 $(CONTROLLER_GEN): $(LOCALBIN)
-	test -s $(LOCALBIN)/controller-gen && $(LOCALBIN)/controller-gen --version | grep -q $(CONTROLLER_TOOLS_VERSION) || \
-	{ go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION) && \
-		mv $(GOBIN)/$(shell go env GOOS)_$(shell go env GOARCH)/controller-gen $(LOCALBIN)/controller-gen ; }
+	test -s $(LOCALBIN)/controller-gen && $(LOCALBIN)/controller-gen --version | grep -q $(CONTROLLER_TOOLS_VERSION) && exit 0 \
+		|| go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
+	test -s $(GOBIN)/controller-gen && \
+		ln -s $(GOBIN)/controller-gen $(LOCALBIN)/controller-gen || \
+		ln -s $(GOBIN)/$(shell go env GOOS)_$(shell go env GOARCH)/controller-gen $(LOCALBIN)/controller-gen
 
 .PHONY: schemas
 schemas: fmt controller-gen
@@ -212,9 +214,11 @@ schemas: fmt controller-gen
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
 $(ENVTEST): $(LOCALBIN)
-	test -s $(LOCALBIN)/setup-envtest || \
-	{ go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest && \
-		mv $(GOBIN)/$(shell go env GOOS)_$(shell go env GOARCH)/setup-envtest $(LOCALBIN)/setup-envtest ; }
+	test -s $(LOCALBIN)/setup-envtest && exit 0 \
+		|| go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+	test -s $(GOBIN)/setup-envtest && \
+		ln -s $(GOBIN)/setup-envtest $(LOCALBIN)/setup-envtest || \
+		ln -s $(GOBIN)/$(shell go env GOOS)_$(shell go env GOARCH)/setup-envtest $(LOCALBIN)/setup-envtest
 
 .PHONY: operator-sdk
 OPERATOR_SDK ?= $(LOCALBIN)/operator-sdk

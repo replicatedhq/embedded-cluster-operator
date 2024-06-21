@@ -42,6 +42,10 @@ func Upgrade(ctx context.Context, cli client.Client, in *clusterv1beta1.Installa
 		// in airgap installations we need to copy the artifacts to the nodes and then autopilot
 		// will copy the images to the cluster so we can start the new operator.
 
+		if localArtifactMirrorImage == "" {
+			return fmt.Errorf("local artifact mirror image is required for airgap installations")
+		}
+
 		err := metadata.CopyVersionMetadataToCluster(ctx, cli, in)
 		if err != nil {
 			return fmt.Errorf("copy version metadata to cluster: %w", err)

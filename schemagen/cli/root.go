@@ -85,7 +85,7 @@ func generateSchemas(v *viper.Viper) error {
 		}
 
 		for _, version := range crd.Spec.Versions {
-			outFile := fmt.Sprintf("%s-ec-%s.json", crd.Spec.Names.Singular, version.Name)
+			outFile := fmt.Sprintf("%s-embeddedcluster-%s.json", crd.Spec.Names.Singular, version.Name)
 			if err := writeSchema(version.Schema.OpenAPIV3Schema, filepath.Join(workdir, v.GetString("output-dir"), outFile)); err != nil {
 				return errors.Wrapf(err, "failed to write %s schema", crd.Spec.Names.Singular)
 			}

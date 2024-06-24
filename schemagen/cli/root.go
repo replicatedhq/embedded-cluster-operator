@@ -84,6 +84,10 @@ func generateSchemas(v *viper.Viper) error {
 			return errors.New("failed to cast crd")
 		}
 
+		// Do not generate schema for the installation CRD
+		if crd.Spec.Names.Singular == "installation" {
+			return nil
+		}
 		for _, version := range crd.Spec.Versions {
 			outFile := fmt.Sprintf("%s-embeddedcluster-%s.json", crd.Spec.Names.Singular, version.Name)
 			if err := writeSchema(version.Schema.OpenAPIV3Schema, filepath.Join(workdir, v.GetString("output-dir"), outFile)); err != nil {

@@ -302,3 +302,12 @@ catalog-push: ## Push a catalog image.
 build-ttl.sh:
 	docker build --platform linux/amd64 -t ttl.sh/${CURRENT_USER}/embedded-cluster-operator-image:24h .
 	docker push ttl.sh/${CURRENT_USER}/embedded-cluster-operator-image:24h
+
+.PHONY: build-chart-ttl.sh
+build-chart-ttl.sh: build-ttl.sh
+build-chart-ttl.sh: export CHART_VERSION = 0.0.0
+build-chart-ttl.sh: export OPERATOR_IMAGE_NAME = ttl.sh/${CURRENT_USER}/embedded-cluster-operator-image
+build-chart-ttl.sh: export OPERATOR_IMAGE_TAG = 24h
+build-chart-ttl.sh: export CHART_REMOTE = oci://ttl.sh/${CURRENT_USER}
+build-chart-ttl.sh:
+	cd charts/embedded-cluster-operator && ../../scripts/publish-helm-chart.sh

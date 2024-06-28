@@ -46,6 +46,7 @@ import (
 	"github.com/replicatedhq/embedded-cluster-kinds/apis/v1beta1"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/artifacts"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/autopilot"
+	"github.com/replicatedhq/embedded-cluster-operator/pkg/charts"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/k8sutil"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/metadata"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/metrics"
@@ -679,18 +680,9 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 		return fmt.Errorf("failed to get cluster config: %w", err)
 	}
 
-	combinedConfigs := mergeHelmConfigs(ctx, meta, in, clusterConfig)
-
-	if in.Spec.AirGap {
-		// if in airgap mode then all charts are already on the node's disk. we just need to
-		// make sure that the helm charts are pointing to the right location on disk and that
-		// we do not have any kind of helm repository configuration.
-		combinedConfigs = patchExtensionsForAirGap(combinedConfigs)
-	}
-
-	combinedConfigs, err = applyUserProvidedAddonOverrides(in, combinedConfigs)
+	combinedConfigs, err := charts.K0sHelmExtensionsFromInstallation(ctx, in, meta, &clusterConfig)
 	if err != nil {
-		return fmt.Errorf("failed to apply user provided overrides: %w", err)
+		return fmt.Errorf("failed to get helm charts from installation: %w", err)
 	}
 
 	existingHelm := &k0sv1beta1.HelmExtensions{}

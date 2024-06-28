@@ -14,6 +14,7 @@ import (
 	ectypes "github.com/replicatedhq/embedded-cluster-kinds/types"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/artifacts"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/autopilot"
+	"github.com/replicatedhq/embedded-cluster-operator/pkg/charts"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/k8sutil"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/metadata"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/release"
@@ -95,14 +96,9 @@ func createInstallation(ctx context.Context, cli client.Client, in *clusterv1bet
 func applyOperatorChart(ctx context.Context, cli client.Client, in *clusterv1beta1.Installation) error {
 	log := ctrl.LoggerFrom(ctx)
 
-	metadata, err := release.MetadataFor(ctx, in, cli)
+	operatorChart, err := getOperatorChart(ctx, cli, in)
 	if err != nil {
-		return fmt.Errorf("get release metadata: %w", err)
-	}
-
-	operatorChart, err := getOperatorChartFromMetadata(metadata)
-	if err != nil {
-		return fmt.Errorf("get operator chart from metadata: %w", err)
+		return fmt.Errorf("get operator chart: %w", err)
 	}
 
 	clusterConfig, err := getExistingClusterConfig(ctx, cli)
@@ -115,7 +111,7 @@ func applyOperatorChart(ctx context.Context, cli client.Client, in *clusterv1bet
 	// patch the cluster config, but this command is run from an ephemeral binary in the pod, and
 	// when the cluster is upgraded it may no longer be available.
 
-	err = patchClusterConfigOperatorChart(ctx, cli, clusterConfig, operatorChart)
+	err = patchClusterConfigOperatorChart(ctx, cli, clusterConfig, *operatorChart)
 	if err != nil {
 		return fmt.Errorf("patch clusterconfig with operator chart: %w", err)
 	}
@@ -209,6 +205,33 @@ func getExistingClusterConfig(ctx context.Context, cli client.Client) (*k0sv1bet
 		return nil, fmt.Errorf("get chart: %w", err)
 	}
 	return clusterConfig, nil
+}
+
+func getOperatorChart(ctx context.Context, cli client.Client, in *clusterv1beta1.Installation) (*k0sv1beta1.Chart, error) {
+	metadata, err := release.MetadataFor(ctx, in, cli)
+	if err != nil {
+		return nil, fmt.Errorf("get release metadata: %w", err)
+	}
+
+	// fetch the current clusterConfig
+	var clusterConfig k0sv1beta1.ClusterConfig
+	err = cli.Get(ctx, client.ObjectKey{Name: "k0s", Namespace: "kube-system"}, &clusterConfig)
+	if err != nil {
+		return nil, fmt.Errorf("get cluster config: %w", err)
+	}
+
+	combinedConfigs, err := charts.K0sHelmExtensionsFromInstallation(ctx, in, metadata, &clusterConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get helm charts from installation: %w", err)
+	}
+
+	for _, chart := range combinedConfigs.Charts {
+		if chart.Name == operatorChartName {
+			return &chart, nil
+		}
+	}
+
+	return nil, fmt.Errorf("operator chart not found")
 }
 
 func getOperatorChartFromMetadata(metadata *ectypes.ReleaseMetadata) (k0sv1beta1.Chart, error) {

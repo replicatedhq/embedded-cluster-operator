@@ -40,6 +40,7 @@ import (
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 
 	"github.com/replicatedhq/embedded-cluster-kinds/apis/v1beta1"
@@ -282,9 +283,16 @@ func (r *InstallationReconciler) CopyArtifactsToNodes(ctx context.Context, in *v
 		return false, nil
 	}
 
+	op, err := artifacts.EnsureRegistrySecretInECNamespace(ctx, r.Client, in)
+	if err != nil {
+		return false, fmt.Errorf("failed to ensure registry secret in ec namespace: %w", err)
+	} else if op != controllerutil.OperationResultNone {
+		log.Info("Registry credentials secret changed", "operation", op)
+	}
+
 	log.Info("Ensuring artifacts job for nodes")
 
-	err := artifacts.EnsureArtifactsJobForNodes(ctx, r.Client, in, localArtifactMirrorImage)
+	err = artifacts.EnsureArtifactsJobForNodes(ctx, r.Client, in, localArtifactMirrorImage)
 	if err != nil {
 		return false, fmt.Errorf("failed to ensure artifacts job for nodes: %w", err)
 	}

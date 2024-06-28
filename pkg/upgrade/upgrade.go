@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 const (
@@ -246,7 +247,14 @@ func ensureAirgapArtifactsOnNodes(ctx context.Context, cli client.Client, in *cl
 
 	log.Info("Placing artifacts on nodes...")
 
-	err := artifacts.EnsureArtifactsJobForNodes(ctx, cli, in, localArtifactMirrorImage)
+	op, err := artifacts.EnsureRegistrySecretInECNamespace(ctx, cli, in)
+	if err != nil {
+		return fmt.Errorf("ensure registry secret in ec namespace: %w", err)
+	} else if op != controllerutil.OperationResultNone {
+		log.Info("Registry credentials secret changed", "operation", op)
+	}
+
+	err = artifacts.EnsureArtifactsJobForNodes(ctx, cli, in, localArtifactMirrorImage)
 	if err != nil {
 		return fmt.Errorf("ensure artifacts job for nodes: %w", err)
 	}

@@ -113,8 +113,8 @@ test: manifests fmt vet envtest ## Run tests.
 ##@ Build
 
 .PHONY: build
-build: GOOS ?= $(shell go env GOOS)
-build: GOARCH ?= $(shell go env GOARCH)
+build: GOOS = linux
+build: GOARCH = amd64
 build: manifests fmt vet ## Build manager binary.
 	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o bin/manager main.go
 

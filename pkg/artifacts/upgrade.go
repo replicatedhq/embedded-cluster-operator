@@ -211,8 +211,9 @@ func getArtifactJobForNode(ctx context.Context, cli client.Client, in *clusterv1
 	inDataEncoded := base64.StdEncoding.EncodeToString(inData)
 
 	job := copyArtifactsJob.DeepCopy()
-	job.Name = util.NameWithLengthLimit(copyArtifactsJobPrefix, node.Name)
-	job.Annotations = applyArtifactsJobAnnotations(job.GetAnnotations(), in, hash)
+	job.ObjectMeta.Name = util.NameWithLengthLimit(copyArtifactsJobPrefix, node.Name)
+	job.ObjectMeta.Labels = applyECOperatorLabels(job.ObjectMeta.Labels, "upgrader")
+	job.ObjectMeta.Annotations = applyArtifactsJobAnnotations(job.GetAnnotations(), in, hash)
 	job.Spec.Template.Spec.NodeName = node.Name
 	job.Spec.Template.Spec.Containers[0].Env = append(
 		job.Spec.Template.Spec.Containers[0].Env,
@@ -221,6 +222,7 @@ func getArtifactJobForNode(ctx context.Context, cli client.Client, in *clusterv1
 	)
 
 	job.Spec.Template.Spec.Containers[0].Image = localArtifactMirrorImage
+	job.Spec.Template.Spec.ImagePullSecrets = append(job.Spec.Template.Spec.ImagePullSecrets, GetRegistryImagePullSecret())
 
 	if in.GetUID() != "" {
 		err = ctrl.SetControllerReference(in, job, cli.Scheme())

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	runtimejson "k8s.io/apimachinery/pkg/runtime/serializer/json"
@@ -35,7 +35,7 @@ func EnsureObject(ctx context.Context, cli client.Client, obj client.Object, app
 	copy := obj.DeepCopyObject().(client.Object)
 	err := cli.Get(ctx, key, copy)
 	if err != nil {
-		if !errors.IsNotFound(err) {
+		if !k8serrors.IsNotFound(err) {
 			return fmt.Errorf("get object: %w", err)
 		}
 	} else if opts.ShouldDelete != nil && opts.ShouldDelete(copy) {
@@ -46,7 +46,7 @@ func EnsureObject(ctx context.Context, cli client.Client, obj client.Object, app
 		}
 		err = wait.PollUntilContextCancel(ctx, 2*time.Second, true, func(ctx context.Context) (bool, error) {
 			err := cli.Get(ctx, key, copy)
-			if errors.IsNotFound(err) {
+			if k8serrors.IsNotFound(err) {
 				return true, nil
 			} else if err != nil {
 				return false, fmt.Errorf("get object: %w", err)

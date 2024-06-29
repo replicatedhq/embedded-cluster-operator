@@ -591,31 +591,6 @@ func Test_detectChartDrift(t *testing.T) {
 			want:      true,
 			wantNames: []string{"newchart"},
 		},
-		// 		embeddedBinaryName: embedded-cluster-smoke-test-staging-app
-		// embeddedClusterID: faf52c85-9b25-41f2-aedb-5b913f642383
-		// embeddedClusterK0sVersion: v1.29.5+k0s.0-ec.0
-		// embeddedClusterVersion: dev-82ec353-upgrade
-		// global:
-		//   labels:
-		//     release-custom-label: release-clustom-value
-		//     replicated.com/disaster-recovery: infra
-		//     replicated.com/disaster-recovery-chart: embedded-cluster-operator
-		// kotsVersion: 1.109.14
-		// resources:
-		//   requests:
-		//     cpu: 123m
-		// utilsImage: busybox:1.36.1
-		//  embeddedClusterK0sVersion: v1.29.5+k0s.0-ec.0
-		// embeddedClusterVersion: dev-82ec353-upgrade
-		// global:
-		//   labels:
-		//     replicated.com/disaster-recovery: infra
-		//     replicated.com/disaster-recovery-chart: embedded-cluster-operator
-		// kotsVersion: 1.109.14
-		// resources:
-		//   requests:
-		//     cpu: 123m
-		// utilsImage: busybox:1.36.1
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

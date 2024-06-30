@@ -40,7 +40,6 @@ import (
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 
 	"github.com/replicatedhq/embedded-cluster-kinds/apis/v1beta1"
@@ -271,85 +270,6 @@ func (r *InstallationReconciler) ReportInstallationChanges(ctx context.Context, 
 	}
 }
 
-// CopyArtifactsToNodes copies the installation artifacts to the nodes in the cluster.
-// This is done by creating a job for each node in the cluster, which will pull the
-// artifacts from the internal registry.
-func (r *InstallationReconciler) CopyArtifactsToNodes(ctx context.Context, in *v1beta1.Installation, localArtifactMirrorImage string) (bool, error) {
-	log := ctrl.LoggerFrom(ctx)
-
-	log.Info("Evaluating jobs for copying artifacts to nodes", "installation", in.Name)
-	if in.Spec.Artifacts == nil {
-		in.Status.State = v1beta1.InstallationStateFailed
-		in.Status.Reason = "Artifacts locations not specified for an airgap installation"
-		return false, nil
-	}
-
-	op, err := artifacts.EnsureRegistrySecretInECNamespace(ctx, r.Client, in)
-	if err != nil {
-		return false, fmt.Errorf("failed to ensure registry secret in ec namespace: %w", err)
-	} else if op != controllerutil.OperationResultNone {
-		log.Info("Registry credentials secret changed", "operation", op)
-	}
-
-	log.Info("Ensuring artifacts job for nodes")
-
-	err = artifacts.EnsureArtifactsJobForNodes(ctx, r.Client, in, localArtifactMirrorImage)
-	if err != nil {
-		return false, fmt.Errorf("failed to ensure artifacts job for nodes: %w", err)
-	}
-
-	jobs, err := artifacts.ListArtifactsJobForNodes(ctx, r.Client, in)
-	if err != nil {
-		return false, fmt.Errorf("failed to list artifacts jobs for nodes: %w", err)
-	}
-
-	status := map[string]string{}
-	ready := true
-	for nodeName, job := range jobs {
-		if job == nil {
-			ready = false
-			status[nodeName] = "JobNotFound"
-			log.Info("Job for node not found", "node", nodeName)
-			continue
-		}
-
-		// from now on we know we analysing the correct job for the installation.
-		if job.Status.Succeeded > 0 {
-			status[nodeName] = "JobSucceeded"
-			log.Info("Job for node succeeded", "node", nodeName)
-			continue
-		}
-
-		ready = false
-		status[nodeName] = "JobRunning"
-		for _, cond := range job.Status.Conditions {
-			if cond.Type == batchv1.JobFailed {
-				if cond.Status == corev1.ConditionTrue {
-					log.Info("Job for node found in a faulty state", "node", nodeName)
-					status[nodeName] = fmt.Sprintf("JobFailed: %s", cond.Message)
-				}
-				break
-			}
-		}
-		log.Info("Job for node still running", "node", nodeName)
-	}
-
-	if ready {
-		return true, nil
-	}
-
-	all := []string{}
-	for name, state := range status {
-		all = append(all, fmt.Sprintf("%s(%s)", name, state))
-	}
-	in.Status.Reason = fmt.Sprintf("Copying artifacts to nodes: %s", strings.Join(all, ", "))
-	in.Status.State = v1beta1.InstallationStateCopyingArtifacts
-	if strings.Contains(in.Status.Reason, "JobFailed") {
-		in.Status.State = v1beta1.InstallationStateFailed
-	}
-	return false, nil
-}
-
 // HasOnlyOneInstallation returns true if only one Installation object exists in the cluster.
 func (r *InstallationReconciler) HasOnlyOneInstallation(ctx context.Context) (bool, error) {
 	ins, err := r.listInstallations(ctx)
@@ -364,8 +284,6 @@ func (r *InstallationReconciler) HasOnlyOneInstallation(ctx context.Context) (bo
 // upgrade plan already exists we make sure the installation status is updated with the
 // latest plan status.
 func (r *InstallationReconciler) ReconcileK0sVersion(ctx context.Context, in *v1beta1.Installation) error {
-	log := ctrl.LoggerFrom(ctx)
-
 	// starts by checking if this is the unique installation object in the cluster. if
 	// this is true then we don't need to sync anything as this is part of the initial
 	// cluster installation.
@@ -430,24 +348,6 @@ func (r *InstallationReconciler) ReconcileK0sVersion(ctx context.Context, in *v1
 	if running.GreaterThan(desired) {
 		in.Status.SetState(v1beta1.InstallationStateFailed, "Downgrades not supported", nil)
 		return nil
-	}
-
-	if in.Spec.AirGap {
-		image := meta.Artifacts["local-artifact-mirror-image"]
-		if image == "" {
-			reason := "No local-artifact-mirror-image defined in release bundle"
-			in.Status.SetState(v1beta1.InstallationStateFailed, reason, nil)
-			return nil
-		}
-		log.Info("Using local-artifact-mirror image", "image", image)
-
-		// in airgap installations let's make sure all assets have been copied to nodes.
-		// this may take some time so we only move forward when 'ready'.
-		if ready, err := r.CopyArtifactsToNodes(ctx, in, image); err != nil {
-			return fmt.Errorf("failed to copy artifacts to nodes: %w", err)
-		} else if !ready {
-			return nil
-		}
 	}
 
 	var plan apv1b2.Plan

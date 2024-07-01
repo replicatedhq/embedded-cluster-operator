@@ -43,7 +43,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 
 	"github.com/replicatedhq/embedded-cluster-kinds/apis/v1beta1"
-	"github.com/replicatedhq/embedded-cluster-operator/pkg/artifacts"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/autopilot"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/charts"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/k8sutil"
@@ -736,18 +735,6 @@ func (r *InstallationReconciler) StartAutopilotUpgrade(ctx context.Context, in *
 	// only k0s binaries, 3) we are upgrading both, 4) we are upgrading neither. we populate the
 	// 'commands' slice with the commands necessary to execute these operations.
 	var commands []apv1b2.PlanCommand
-
-	if in.Spec.AirGap {
-		// if we are running in an airgap environment all assets are already present in the
-		// node and are served by the local-artifact-mirror binary listening on localhost
-		// port 50000. we just need to get autopilot to fetch the k0s binary from there.
-		k0surl = "http://127.0.0.1:50000/bin/k0s-upgrade"
-		command, err := artifacts.CreateAutopilotAirgapPlanCommand(ctx, r.Client, in)
-		if err != nil {
-			return fmt.Errorf("failed to create airgap plan command: %w", err)
-		}
-		commands = append(commands, *command)
-	}
 
 	// if the kubernetes version has changed we create an upgrade command
 	shouldUpgrade, err := r.shouldUpgradeK0s(ctx, in, meta.Versions["Kubernetes"])

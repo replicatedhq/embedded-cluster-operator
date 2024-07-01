@@ -986,6 +986,18 @@ func (r *InstallationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, fmt.Errorf("failed to reconcile k0s version: %w", err)
 	}
 
+	// if the k0s upgrade is still in progress this will wait until the upgrade is finished before
+	// moving on to the next steps.
+	if in.Status.State != v1beta1.InstallationStateKubernetesInstalled {
+		if err := r.Status().Update(ctx, in.DeepCopy()); err != nil {
+			if errors.IsConflict(err) {
+				return ctrl.Result{}, fmt.Errorf("failed to update status: conflict")
+			}
+			return ctrl.Result{}, fmt.Errorf("failed to update installation status: %w", err)
+		}
+		return ctrl.Result{}, nil
+	}
+
 	// cleanup openebs stateful pods
 	if err := r.ReconcileOpenebs(ctx, in); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to reconcile openebs: %w", err)

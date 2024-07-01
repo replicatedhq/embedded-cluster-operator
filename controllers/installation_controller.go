@@ -705,6 +705,9 @@ func (r *InstallationReconciler) ReconcileRegistry(ctx context.Context, in *v1be
 	if clusterConfig.Spec != nil && clusterConfig.Spec.Network != nil {
 		serviceCIDR = clusterConfig.Spec.Network.ServiceCIDR
 	}
+	if in.Spec.Network != nil && in.Spec.Network.ServiceCIDR != "" {
+		serviceCIDR = in.Spec.Network.ServiceCIDR
+	}
 
 	err := registry.EnsureResources(ctx, in, r.Client, serviceCIDR)
 	if err != nil {

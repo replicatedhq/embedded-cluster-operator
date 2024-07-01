@@ -189,6 +189,19 @@ func updateInfraChartsFromInstall(ctx context.Context, in *v1beta1.Installation,
 			if clusterConfig.Spec != nil && clusterConfig.Spec.Network != nil {
 				serviceCIDR = clusterConfig.Spec.Network.ServiceCIDR
 			}
+			if in.Spec.Network != nil {
+				serviceCIDR = in.Spec.Network.ServiceCIDR
+			}
+			registryEndpoint, err := registry.GetRegistryServiceIP(serviceCIDR)
+			if err != nil {
+				log.Error(err, "failed to get registry endpoint", "chart", chart.Name)
+				continue
+			}
+
+			newVals, err := setHelmValue(chart.Values, "service.clusterIP", registryEndpoint)
+			if err != nil {
+				log.Error(err, "failed to set helm values service.clusterIP", "chart", chart.Name)
+			}
 
 			seaweedfsS3Endpoint, err := registry.GetSeaweedfsS3Endpoint(serviceCIDR)
 			if err != nil {
@@ -196,9 +209,9 @@ func updateInfraChartsFromInstall(ctx context.Context, in *v1beta1.Installation,
 				continue
 			}
 
-			newVals, err := setHelmValue(chart.Values, "s3.regionEndpoint", seaweedfsS3Endpoint)
+			newVals, err = setHelmValue(newVals, "s3.regionEndpoint", seaweedfsS3Endpoint)
 			if err != nil {
-				log.Error(err, "failed to set helm values embeddedClusterID", "chart", chart.Name)
+				log.Error(err, "failed to set helm values s3.regionEndpoint", "chart", chart.Name)
 				continue
 			}
 

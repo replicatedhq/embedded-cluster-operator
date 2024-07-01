@@ -52,6 +52,7 @@ jobs:
       env:
         HELM_USER: ${{secrets.KOTS_HELM_USER_STAGING}}
         HELM_PASS: ${{secrets.KOTS_HELM_PASS_STAGING}}
+        HELM_REGISTRY: registry.staging.replicated.com
         CHART_VERSION: ${{steps.tag.outputs.tag}}
       run: |
         export OPERATOR_IMAGE_NAME=registry.staging.replicated.com/library/embedded-cluster-operator-image

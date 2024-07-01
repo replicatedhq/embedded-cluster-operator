@@ -21,7 +21,7 @@ const (
 
 	// registryLowerBandIPIndex is the index of the registry service IP in the service CIDR.
 	// this is shared with the CLI as it is set on initial installation as well.
-	registryLowerBandIPIndex = 11
+	registryLowerBandIPIndex = 10
 )
 
 func EnsureResources(ctx context.Context, in *clusterv1beta1.Installation, cli client.Client, serviceCIDR string) error {

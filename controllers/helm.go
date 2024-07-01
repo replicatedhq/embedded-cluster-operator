@@ -17,6 +17,7 @@ import (
 	ectypes "github.com/replicatedhq/embedded-cluster-kinds/types"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/k8sutil"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/registry"
+	"github.com/replicatedhq/embedded-cluster-operator/pkg/util"
 )
 
 const DEFAULT_VENDOR_CHART_ORDER = 10
@@ -185,13 +186,7 @@ func updateInfraChartsFromInstall(ctx context.Context, in *v1beta1.Installation,
 				continue
 			}
 
-			serviceCIDR := k0sv1beta1.DefaultNetwork().ServiceCIDR
-			if clusterConfig.Spec != nil && clusterConfig.Spec.Network != nil {
-				serviceCIDR = clusterConfig.Spec.Network.ServiceCIDR
-			}
-			if in.Spec.Network != nil {
-				serviceCIDR = in.Spec.Network.ServiceCIDR
-			}
+			serviceCIDR := util.ClusterServiceCIDR(clusterConfig, in)
 			registryEndpoint, err := registry.GetRegistryServiceIP(serviceCIDR)
 			if err != nil {
 				log.Error(err, "failed to get registry endpoint", "chart", chart.Name)

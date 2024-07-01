@@ -701,13 +701,7 @@ func (r *InstallationReconciler) ReconcileRegistry(ctx context.Context, in *v1be
 		return fmt.Errorf("failed to get cluster config: %w", err)
 	}
 
-	serviceCIDR := k0sv1beta1.DefaultNetwork().ServiceCIDR
-	if clusterConfig.Spec != nil && clusterConfig.Spec.Network != nil {
-		serviceCIDR = clusterConfig.Spec.Network.ServiceCIDR
-	}
-	if in.Spec.Network != nil && in.Spec.Network.ServiceCIDR != "" {
-		serviceCIDR = in.Spec.Network.ServiceCIDR
-	}
+	serviceCIDR := util.ClusterServiceCIDR(clusterConfig, in)
 
 	err := registry.EnsureResources(ctx, in, r.Client, serviceCIDR)
 	if err != nil {

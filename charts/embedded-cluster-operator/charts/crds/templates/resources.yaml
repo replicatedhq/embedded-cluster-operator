@@ -284,6 +284,10 @@ spec:
               artifacts:
                 description: Artifacts holds the location of the airgap bundle.
                 properties:
+                  additionalArtifacts:
+                    additionalProperties:
+                      type: string
+                    type: object
                   embeddedClusterBinary:
                     type: string
                   embeddedClusterMetadata:
@@ -482,7 +486,7 @@ spec:
                 description: |-
                   ConfigSecret holds a secret name and namespace. If this is set it means that
                   the Config for this Installation object must be read from there. This option
-                  superseeds (overrides) the Config field.
+                  supersedes (overrides) the Config field.
                 properties:
                   name:
                     type: string
@@ -509,6 +513,26 @@ spec:
               metricsBaseURL:
                 description: MetricsBaseURL holds the base URL for the metrics server.
                 type: string
+              network:
+                description: Network holds the network configuration.
+                properties:
+                  nodePortRange:
+                    type: string
+                  podCIDR:
+                    type: string
+                  serviceCIDR:
+                    type: string
+                type: object
+              proxy:
+                description: Proxy holds the proxy configuration.
+                properties:
+                  httpProxy:
+                    type: string
+                  httpsProxy:
+                    type: string
+                  noProxy:
+                    type: string
+                type: object
             type: object
           status:
             description: InstallationStatus defines the observed state of Installation

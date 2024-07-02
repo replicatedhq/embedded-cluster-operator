@@ -17,6 +17,7 @@ import (
 	ectypes "github.com/replicatedhq/embedded-cluster-kinds/types"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/k8sutil"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/registry"
+	"github.com/replicatedhq/embedded-cluster-operator/pkg/util"
 )
 
 const DEFAULT_VENDOR_CHART_ORDER = 10
@@ -144,6 +145,15 @@ func updateInfraChartsFromInstall(ctx context.Context, in *v1beta1.Installation,
 				continue
 			}
 
+			if in.Spec.Proxy != nil {
+				extraEnv := getExtraEnvFromProxy(in.Spec.Proxy.HTTPProxy, in.Spec.Proxy.HTTPSProxy, in.Spec.Proxy.NoProxy)
+				newVals, err = setHelmValue(newVals, "extraEnv", extraEnv)
+				if err != nil {
+					log.Error(err, "failed to set helm values extraEnv", "chart", chart.Name)
+					continue
+				}
+			}
+
 			charts[i].Values = newVals
 		}
 		if chart.Name == "embedded-cluster-operator" {
@@ -160,6 +170,15 @@ func updateInfraChartsFromInstall(ctx context.Context, in *v1beta1.Installation,
 				continue
 			}
 
+			if in.Spec.Proxy != nil {
+				extraEnv := getExtraEnvFromProxy(in.Spec.Proxy.HTTPProxy, in.Spec.Proxy.HTTPSProxy, in.Spec.Proxy.NoProxy)
+				newVals, err = setHelmValue(newVals, "extraEnv", extraEnv)
+				if err != nil {
+					log.Error(err, "failed to set helm values extraEnv", "chart", chart.Name)
+					continue
+				}
+			}
+
 			charts[i].Values = newVals
 		}
 		if chart.Name == "docker-registry" {
@@ -167,9 +186,16 @@ func updateInfraChartsFromInstall(ctx context.Context, in *v1beta1.Installation,
 				continue
 			}
 
-			serviceCIDR := k0sv1beta1.DefaultNetwork().ServiceCIDR
-			if clusterConfig.Spec != nil && clusterConfig.Spec.Network != nil {
-				serviceCIDR = clusterConfig.Spec.Network.ServiceCIDR
+			serviceCIDR := util.ClusterServiceCIDR(clusterConfig, in)
+			registryEndpoint, err := registry.GetRegistryServiceIP(serviceCIDR)
+			if err != nil {
+				log.Error(err, "failed to get registry endpoint", "chart", chart.Name)
+				continue
+			}
+
+			newVals, err := setHelmValue(chart.Values, "service.clusterIP", registryEndpoint)
+			if err != nil {
+				log.Error(err, "failed to set helm values service.clusterIP", "chart", chart.Name)
 			}
 
 			seaweedfsS3Endpoint, err := registry.GetSeaweedfsS3Endpoint(serviceCIDR)
@@ -178,16 +204,51 @@ func updateInfraChartsFromInstall(ctx context.Context, in *v1beta1.Installation,
 				continue
 			}
 
-			newVals, err := setHelmValue(chart.Values, "s3.regionEndpoint", seaweedfsS3Endpoint)
+			newVals, err = setHelmValue(newVals, "s3.regionEndpoint", seaweedfsS3Endpoint)
 			if err != nil {
-				log.Error(err, "failed to set helm values embeddedClusterID", "chart", chart.Name)
+				log.Error(err, "failed to set helm values s3.regionEndpoint", "chart", chart.Name)
 				continue
 			}
 
 			charts[i].Values = newVals
 		}
+		if chart.Name == "velero" {
+			if in.Spec.Proxy != nil {
+				extraEnvVars := map[string]interface{}{
+					"extraEnvVars": map[string]string{
+						"HTTP_PROXY":  in.Spec.Proxy.HTTPProxy,
+						"HTTPS_PROXY": in.Spec.Proxy.HTTPSProxy,
+						"NO_PROXY":    in.Spec.Proxy.NoProxy,
+					},
+				}
+
+				newVals, err := setHelmValue(chart.Values, "configuration", extraEnvVars)
+				if err != nil {
+					log.Error(err, "failed to set helm values extraEnvVars", "chart", chart.Name)
+					continue
+				}
+				charts[i].Values = newVals
+			}
+		}
 	}
 	return charts
+}
+
+func getExtraEnvFromProxy(httpProxy string, httpsProxy string, noProxy string) []map[string]interface{} {
+	extraEnv := []map[string]interface{}{}
+	extraEnv = append(extraEnv, map[string]interface{}{
+		"name":  "HTTP_PROXY",
+		"value": httpProxy,
+	})
+	extraEnv = append(extraEnv, map[string]interface{}{
+		"name":  "HTTPS_PROXY",
+		"value": httpsProxy,
+	})
+	extraEnv = append(extraEnv, map[string]interface{}{
+		"name":  "NO_PROXY",
+		"value": noProxy,
+	})
+	return extraEnv
 }
 
 // detect if the charts currently installed in the cluster (currentConfigs) match the desired charts (combinedConfigs)

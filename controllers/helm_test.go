@@ -1380,6 +1380,82 @@ func Test_updateInfraChartsFromInstall(t *testing.T) {
 			},
 		},
 		{
+			name: "admin console and operator with proxy",
+			args: args{
+				in: &v1beta1.Installation{
+					Spec: v1beta1.InstallationSpec{
+						ClusterID:        "testid",
+						BinaryName:       "testbin",
+						AirGap:           false,
+						HighAvailability: false,
+						Proxy: &v1beta1.ProxySpec{
+							HTTPProxy:  "http://proxy",
+							HTTPSProxy: "https://proxy",
+							NoProxy:    "noproxy",
+						},
+					},
+				},
+				charts: []k0sv1beta1.Chart{
+					{
+						Name:   "test",
+						Values: "abc: xyz",
+					},
+					{
+						Name:   "admin-console",
+						Values: "abc: xyz",
+					},
+					{
+						Name:   "embedded-cluster-operator",
+						Values: "this: that",
+					},
+				},
+			},
+			want: []k0sv1beta1.Chart{
+				{
+					Name:   "test",
+					Values: "abc: xyz",
+				},
+				{
+					Name:   "admin-console",
+					Values: "abc: xyz\nembeddedClusterID: testid\nextraEnv:\n- name: HTTP_PROXY\n  value: http://proxy\n- name: HTTPS_PROXY\n  value: https://proxy\n- name: NO_PROXY\n  value: noproxy\nisAirgap: \"false\"\nisHA: false\n",
+				},
+				{
+					Name:   "embedded-cluster-operator",
+					Values: "embeddedBinaryName: testbin\nembeddedClusterID: testid\nextraEnv:\n- name: HTTP_PROXY\n  value: http://proxy\n- name: HTTPS_PROXY\n  value: https://proxy\n- name: NO_PROXY\n  value: noproxy\nthis: that\n",
+				},
+			},
+		},
+		{
+			name: "velero with proxy",
+			args: args{
+				in: &v1beta1.Installation{
+					Spec: v1beta1.InstallationSpec{
+						ClusterID:        "testid",
+						BinaryName:       "testbin",
+						AirGap:           false,
+						HighAvailability: false,
+						Proxy: &v1beta1.ProxySpec{
+							HTTPProxy:  "http://proxy",
+							HTTPSProxy: "https://proxy",
+							NoProxy:    "noproxy",
+						},
+					},
+				},
+				charts: []k0sv1beta1.Chart{
+					{
+						Name:   "velero",
+						Values: "abc: xyz\nconfiguration:\n  extraEnvVars: {}\n",
+					},
+				},
+			},
+			want: []k0sv1beta1.Chart{
+				{
+					Name:   "velero",
+					Values: "abc: xyz\nconfiguration:\n  extraEnvVars:\n    HTTP_PROXY: http://proxy\n    HTTPS_PROXY: https://proxy\n    NO_PROXY: noproxy\n",
+				},
+			},
+		},
+		{
 			name: "docker-registry",
 			args: args{
 				in: &v1beta1.Installation{

@@ -16,7 +16,7 @@ require (
 	github.com/ohler55/ojg v1.22.0
 	github.com/onsi/ginkgo/v2 v2.19.0
 	github.com/onsi/gomega v1.33.1
-	github.com/replicatedhq/embedded-cluster-kinds v1.3.7
+	github.com/replicatedhq/embedded-cluster-kinds v1.4.0-ash
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/multierr v1.11.0
 	gopkg.in/yaml.v2 v2.4.0
@@ -114,5 +114,3 @@ require (
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
-
-replace github.com/replicatedhq/embedded-cluster-kinds => /home/sparrow/go/src/github.com/replicatedhq/embedded-cluster-kinds

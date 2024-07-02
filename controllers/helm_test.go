@@ -1395,7 +1395,7 @@ func Test_updateInfraChartsFromInstall(t *testing.T) {
 						},
 					},
 				},
-				charts: []k0sv1beta1.Chart{
+				charts: []v1beta1.Chart{
 					{
 						Name:   "test",
 						Values: "abc: xyz",
@@ -1410,7 +1410,7 @@ func Test_updateInfraChartsFromInstall(t *testing.T) {
 					},
 				},
 			},
-			want: []k0sv1beta1.Chart{
+			want: []v1beta1.Chart{
 				{
 					Name:   "test",
 					Values: "abc: xyz",
@@ -1441,14 +1441,14 @@ func Test_updateInfraChartsFromInstall(t *testing.T) {
 						},
 					},
 				},
-				charts: []k0sv1beta1.Chart{
+				charts: []v1beta1.Chart{
 					{
 						Name:   "velero",
 						Values: "abc: xyz\nconfiguration:\n  extraEnvVars: {}\n",
 					},
 				},
 			},
-			want: []k0sv1beta1.Chart{
+			want: []v1beta1.Chart{
 				{
 					Name:   "velero",
 					Values: "abc: xyz\nconfiguration:\n  extraEnvVars:\n    HTTP_PROXY: http://proxy\n    HTTPS_PROXY: https://proxy\n    NO_PROXY: noproxy\n",

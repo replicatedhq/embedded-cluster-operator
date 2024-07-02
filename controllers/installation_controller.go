@@ -877,9 +877,9 @@ func (r *InstallationReconciler) ReconcileHelmCharts(ctx context.Context, in *v1
 
 	cfgs := &k0sv1beta1.HelmExtensions{}
 	cfgs, err = v1beta1.ConvertTo(*combinedConfigs, cfgs)
-  if err != nil {
-    return fmt.Errorf("failed to convert chart types: %w", err)
-  }
+	if err != nil {
+		return fmt.Errorf("failed to convert chart types: %w", err)
+	}
 
 	existingHelm := &k0sv1beta1.HelmExtensions{}
 	if clusterConfig.Spec != nil && clusterConfig.Spec.Extensions != nil && clusterConfig.Spec.Extensions.Helm != nil {

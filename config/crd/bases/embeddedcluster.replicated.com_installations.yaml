@@ -117,11 +117,6 @@ spec:
                                   type: string
                                 version:
                                   type: string
-                              required:
-                              - chartname
-                              - name
-                              - namespace
-                              - version
                               type: object
                             type: array
                           concurrencyLevel:

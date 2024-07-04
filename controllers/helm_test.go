@@ -64,7 +64,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 				meta: &ectypes.ReleaseMetadata{
 					Configs: v1beta1.Helm{
 						ConcurrencyLevel: 1,
-						Repositories: []k0sv1beta1.Repository{
+						Repositories: []v1beta1.Repository{
 							{
 								Name: "origrepo",
 							},
@@ -78,7 +78,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 				},
 				in: v1beta1.Extensions{
 					Helm: &v1beta1.Helm{
-						Repositories: []k0sv1beta1.Repository{
+						Repositories: []v1beta1.Repository{
 							{
 								Name: "newrepo",
 							},
@@ -94,7 +94,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 			},
 			want: &v1beta1.Helm{
 				ConcurrencyLevel: 1,
-				Repositories: []k0sv1beta1.Repository{
+				Repositories: []v1beta1.Repository{
 					{
 						Name: "origrepo",
 					},
@@ -122,7 +122,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 				meta: &ectypes.ReleaseMetadata{
 					Configs: v1beta1.Helm{
 						ConcurrencyLevel: 1,
-						Repositories: []k0sv1beta1.Repository{
+						Repositories: []v1beta1.Repository{
 							{
 								Name: "origrepo",
 							},
@@ -135,7 +135,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 					},
 					BuiltinConfigs: map[string]v1beta1.Helm{
 						"velero": {
-							Repositories: []k0sv1beta1.Repository{
+							Repositories: []v1beta1.Repository{
 								{
 									Name: "velerorepo",
 								},
@@ -152,7 +152,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 			},
 			want: &v1beta1.Helm{
 				ConcurrencyLevel: 1,
-				Repositories: []k0sv1beta1.Repository{
+				Repositories: []v1beta1.Repository{
 					{
 						Name: "origrepo",
 					},
@@ -179,7 +179,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 				meta: &ectypes.ReleaseMetadata{
 					Configs: v1beta1.Helm{
 						ConcurrencyLevel: 1,
-						Repositories: []k0sv1beta1.Repository{
+						Repositories: []v1beta1.Repository{
 							{
 								Name: "origrepo",
 							},
@@ -192,7 +192,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 					},
 					BuiltinConfigs: map[string]v1beta1.Helm{
 						"seaweedfs": {
-							Repositories: []k0sv1beta1.Repository{
+							Repositories: []v1beta1.Repository{
 								{
 									Name: "seaweedfsrepo",
 								},
@@ -205,7 +205,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 							},
 						},
 						"registry": {
-							Repositories: []k0sv1beta1.Repository{
+							Repositories: []v1beta1.Repository{
 								{
 									Name: "registryrepo",
 								},
@@ -217,7 +217,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 							},
 						},
 						"registry-ha": {
-							Repositories: []k0sv1beta1.Repository{
+							Repositories: []v1beta1.Repository{
 								{
 									Name: "registryharepo",
 								},
@@ -235,7 +235,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 			},
 			want: &v1beta1.Helm{
 				ConcurrencyLevel: 1,
-				Repositories: []k0sv1beta1.Repository{
+				Repositories: []v1beta1.Repository{
 					{
 						Name: "origrepo",
 					},
@@ -263,7 +263,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 				meta: &ectypes.ReleaseMetadata{
 					Configs: v1beta1.Helm{
 						ConcurrencyLevel: 1,
-						Repositories: []k0sv1beta1.Repository{
+						Repositories: []v1beta1.Repository{
 							{
 								Name: "origrepo",
 							},
@@ -276,7 +276,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 					},
 					BuiltinConfigs: map[string]v1beta1.Helm{
 						"seaweedfs": {
-							Repositories: []k0sv1beta1.Repository{
+							Repositories: []v1beta1.Repository{
 								{
 									Name: "seaweedfsrepo",
 								},
@@ -289,7 +289,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 							},
 						},
 						"registry": {
-							Repositories: []k0sv1beta1.Repository{
+							Repositories: []v1beta1.Repository{
 								{
 									Name: "registryrepo",
 								},
@@ -301,7 +301,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 							},
 						},
 						"registry-ha": {
-							Repositories: []k0sv1beta1.Repository{
+							Repositories: []v1beta1.Repository{
 								{
 									Name: "registryharepo",
 								},
@@ -326,7 +326,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 			},
 			want: &v1beta1.Helm{
 				ConcurrencyLevel: 1,
-				Repositories: []k0sv1beta1.Repository{
+				Repositories: []v1beta1.Repository{
 					{
 						Name: "origrepo",
 					},
@@ -361,7 +361,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 				meta: &ectypes.ReleaseMetadata{
 					Configs: v1beta1.Helm{
 						ConcurrencyLevel: 1,
-						Repositories: []k0sv1beta1.Repository{
+						Repositories: []v1beta1.Repository{
 							{
 								Name: "origrepo",
 							},
@@ -374,7 +374,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 					},
 					BuiltinConfigs: map[string]v1beta1.Helm{
 						"seaweedfs": {
-							Repositories: []k0sv1beta1.Repository{
+							Repositories: []v1beta1.Repository{
 								{
 									Name: "seaweedfsrepo",
 								},
@@ -387,7 +387,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 							},
 						},
 						"registry": {
-							Repositories: []k0sv1beta1.Repository{
+							Repositories: []v1beta1.Repository{
 								{
 									Name: "registryrepo",
 								},
@@ -399,7 +399,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 							},
 						},
 						"registry-ha": {
-							Repositories: []k0sv1beta1.Repository{
+							Repositories: []v1beta1.Repository{
 								{
 									Name: "registryharepo",
 								},
@@ -424,7 +424,7 @@ func Test_mergeHelmConfigs(t *testing.T) {
 			},
 			want: &v1beta1.Helm{
 				ConcurrencyLevel: 1,
-				Repositories: []k0sv1beta1.Repository{
+				Repositories: []v1beta1.Repository{
 					{
 						Name: "origrepo",
 					},
@@ -1253,7 +1253,7 @@ func Test_applyUserProvidedAddonOverrides(t *testing.T) {
 			},
 			config: &v1beta1.Helm{
 				ConcurrencyLevel: 999,
-				Repositories: []k0sv1beta1.Repository{
+				Repositories: []v1beta1.Repository{
 					{
 						Name: "repo",
 						URL:  "https://repo",
@@ -1274,7 +1274,7 @@ func Test_applyUserProvidedAddonOverrides(t *testing.T) {
 			},
 			want: &v1beta1.Helm{
 				ConcurrencyLevel: 999,
-				Repositories: []k0sv1beta1.Repository{
+				Repositories: []v1beta1.Repository{
 					{
 						Name: "repo",
 						URL:  "https://repo",

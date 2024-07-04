@@ -71,9 +71,7 @@ spec:
                       concurrencyLevel:
                         type: integer
                       repositories:
-                        description: RepositoriesSettings repository settings
                         items:
-                          description: Repository describes single repository entry. Fields map to the CLI flags for the "helm add" command
                           properties:
                             caFile:
                               type: string
@@ -338,9 +336,7 @@ spec:
                           concurrencyLevel:
                             type: integer
                           repositories:
-                            description: RepositoriesSettings repository settings
                             items:
-                              description: Repository describes single repository entry. Fields map to the CLI flags for the "helm add" command
                               properties:
                                 caFile:
                                   type: string

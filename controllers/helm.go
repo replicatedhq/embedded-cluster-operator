@@ -187,7 +187,7 @@ func updateInfraChartsFromInstall(ctx context.Context, in *v1beta1.Installation,
 			}
 
 			serviceCIDR := util.ClusterServiceCIDR(clusterConfig, in)
-			fmt.Sprintf("serviceCIDR in updateInfraChartsFromInstall: %s", serviceCIDR)
+			fmt.Printf("serviceCIDR in updateInfraChartsFromInstall: %s", serviceCIDR)
 			registryEndpoint, err := registry.GetRegistryServiceIP(serviceCIDR)
 			if err != nil {
 				log.Error(err, "failed to get registry endpoint", "chart", chart.Name)

@@ -124,6 +124,12 @@ func updateInfraChartsFromInstall(ctx context.Context, in *v1beta1.Installation,
 		return charts
 	}
 
+	chartNames := []string{}
+	for _, chart := range charts {
+		chartNames = append(chartNames, chart.Name)
+	}
+	log.Info("updateInfraChartsFromInstall", "charts", chartNames)
+
 	for i, chart := range charts {
 		if chart.Name == "admin-console" {
 			// admin-console has "embeddedClusterID" and "isAirgap" as dynamic values
@@ -187,7 +193,7 @@ func updateInfraChartsFromInstall(ctx context.Context, in *v1beta1.Installation,
 			}
 
 			serviceCIDR := util.ClusterServiceCIDR(clusterConfig, in)
-			fmt.Printf("serviceCIDR in updateInfraChartsFromInstall: %s", serviceCIDR)
+			log.Info("serviceCIDR in updateInfraChartsFromInstall", "serviceCIDR", serviceCIDR)
 			registryEndpoint, err := registry.GetRegistryServiceIP(serviceCIDR)
 			if err != nil {
 				log.Error(err, "failed to get registry endpoint", "chart", chart.Name)

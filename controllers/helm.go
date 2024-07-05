@@ -121,6 +121,7 @@ func updateInfraChartsFromInstall(ctx context.Context, in *v1beta1.Installation,
 	log := ctrl.LoggerFrom(ctx)
 
 	if in == nil {
+		log.Info("updateInfraChartsFromInstall: no installation spec")
 		return charts
 	}
 

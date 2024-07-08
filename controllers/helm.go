@@ -121,7 +121,6 @@ func updateInfraChartsFromInstall(ctx context.Context, in *v1beta1.Installation,
 	log := ctrl.LoggerFrom(ctx)
 
 	if in == nil {
-		log.Info("updateInfraChartsFromInstall: no installation spec")
 		return charts
 	}
 	serviceCIDR := util.ClusterServiceCIDR(clusterConfig, in)
@@ -186,8 +185,6 @@ func updateInfraChartsFromInstall(ctx context.Context, in *v1beta1.Installation,
 		if chart.Name == "docker-registry" {
 			// handle the registry IP, which will always be present in airgap
 			if in.Spec.AirGap {
-				log.Info("serviceCIDRinupdateInfraChartsFromInstall", "serviceCIDR", serviceCIDR)
-
 				registryEndpoint, err := registry.GetRegistryServiceIP(serviceCIDR)
 				if err != nil {
 					log.Error(err, "failed to get registry endpoint", "chart", chart.Name)

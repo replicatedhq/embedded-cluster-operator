@@ -124,12 +124,7 @@ func updateInfraChartsFromInstall(ctx context.Context, in *v1beta1.Installation,
 		log.Info("updateInfraChartsFromInstall: no installation spec")
 		return charts
 	}
-
-	chartNames := []string{}
-	for _, chart := range charts {
-		chartNames = append(chartNames, chart.Name)
-	}
-	log.Info("updateInfraChartsFromInstall", "charts", chartNames)
+	serviceCIDR := util.ClusterServiceCIDR(clusterConfig, in)
 
 	for i, chart := range charts {
 		if chart.Name == "admin-console" {
@@ -189,30 +184,35 @@ func updateInfraChartsFromInstall(ctx context.Context, in *v1beta1.Installation,
 			charts[i].Values = newVals
 		}
 		if chart.Name == "docker-registry" {
+			// handle the registry IP, which will always be present in airgap
+			if in.Spec.AirGap {
+				log.Info("serviceCIDRinupdateInfraChartsFromInstall", "serviceCIDR", serviceCIDR)
+
+				registryEndpoint, err := registry.GetRegistryServiceIP(serviceCIDR)
+				if err != nil {
+					log.Error(err, "failed to get registry endpoint", "chart", chart.Name)
+					continue
+				}
+
+				newVals, err := setHelmValue(chart.Values, "service.clusterIP", registryEndpoint)
+				if err != nil {
+					log.Error(err, "failed to set helm values service.clusterIP", "chart", chart.Name)
+				}
+				charts[i].Values = newVals
+			}
+
 			if !in.Spec.AirGap || !in.Spec.HighAvailability {
 				continue
 			}
 
-			serviceCIDR := util.ClusterServiceCIDR(clusterConfig, in)
-			log.Info("serviceCIDRinupdateInfraChartsFromInstall", "serviceCIDR", serviceCIDR)
-			registryEndpoint, err := registry.GetRegistryServiceIP(serviceCIDR)
-			if err != nil {
-				log.Error(err, "failed to get registry endpoint", "chart", chart.Name)
-				continue
-			}
-
-			newVals, err := setHelmValue(chart.Values, "service.clusterIP", registryEndpoint)
-			if err != nil {
-				log.Error(err, "failed to set helm values service.clusterIP", "chart", chart.Name)
-			}
-
+			// handle the seaweedFS endpoint, which will only be present in HA airgap
 			seaweedfsS3Endpoint, err := registry.GetSeaweedfsS3Endpoint(serviceCIDR)
 			if err != nil {
 				log.Error(err, "failed to get seaweedfs s3 endpoint", "chart", chart.Name)
 				continue
 			}
 
-			newVals, err = setHelmValue(newVals, "s3.regionEndpoint", seaweedfsS3Endpoint)
+			newVals, err := setHelmValue(charts[i].Values, "s3.regionEndpoint", seaweedfsS3Endpoint)
 			if err != nil {
 				log.Error(err, "failed to set helm values s3.regionEndpoint", "chart", chart.Name)
 				continue

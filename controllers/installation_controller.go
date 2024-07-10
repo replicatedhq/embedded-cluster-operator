@@ -1040,6 +1040,9 @@ func (r *InstallationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 }
 
 func (r *InstallationReconciler) needsUpgrade(ctx context.Context, in *v1beta1.Installation) bool {
+	if in.Spec.Config == nil || in.Spec.Config.Version == "" {
+		return false
+	}
 	curstr := strings.TrimPrefix(os.Getenv("EMBEDDEDCLUSTER_VERSION"), "v")
 	desstr := strings.TrimPrefix(in.Spec.Config.Version, "v")
 	return curstr != desstr

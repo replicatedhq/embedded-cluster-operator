@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	autopilotv1beta2 "github.com/k0sproject/k0s/pkg/apis/autopilot/v1beta2"
 	k0sv1beta1 "github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
+	"github.com/replicatedhq/embedded-cluster-kinds/apis/v1beta1"
 	clusterv1beta1 "github.com/replicatedhq/embedded-cluster-kinds/apis/v1beta1"
 	ectypes "github.com/replicatedhq/embedded-cluster-kinds/types"
 	"github.com/replicatedhq/embedded-cluster-operator/pkg/artifacts"
@@ -225,7 +226,13 @@ func getOperatorChart(ctx context.Context, cli client.Client, in *clusterv1beta1
 		return nil, fmt.Errorf("failed to get helm charts from installation: %w", err)
 	}
 
-	for _, chart := range combinedConfigs.Charts {
+	cfgs := k0sv1beta1.HelmExtensions{}
+	cfgs, err = v1beta1.ConvertTo(*combinedConfigs, cfgs)
+	if err != nil {
+		return nil, fmt.Errorf("convert to k0s helm type: %w", err)
+	}
+
+	for _, chart := range cfgs.Charts {
 		if chart.Name == operatorChartName {
 			return &chart, nil
 		}
@@ -235,7 +242,13 @@ func getOperatorChart(ctx context.Context, cli client.Client, in *clusterv1beta1
 }
 
 func getOperatorChartFromMetadata(metadata *ectypes.ReleaseMetadata) (k0sv1beta1.Chart, error) {
-	for _, chart := range metadata.Configs.Charts {
+	cfgs := k0sv1beta1.HelmExtensions{}
+	cfgs, err := v1beta1.ConvertTo(metadata.Configs, cfgs)
+	if err != nil {
+		return k0sv1beta1.Chart{}, fmt.Errorf("convert to k0s helm type: %w", err)
+	}
+
+	for _, chart := range cfgs.Charts {
 		if chart.Name == operatorChartName {
 			return chart, nil
 		}

@@ -29,7 +29,7 @@ const (
 func K0sHelmExtensionsFromInstallation(
 	ctx context.Context, in *clusterv1beta1.Installation,
 	metadata *ectypes.ReleaseMetadata, clusterConfig *k0sv1beta1.ClusterConfig,
-) (*k0sv1beta1.HelmExtensions, error) {
+) (*v1beta1.Helm, error) {
 	combinedConfigs, err := mergeHelmConfigs(ctx, metadata, in, clusterConfig)
 	if err != nil {
 		return nil, fmt.Errorf("merge helm configs: %w", err)
@@ -51,9 +51,9 @@ func K0sHelmExtensionsFromInstallation(
 }
 
 // merge the default helm charts and repositories (from meta.Configs) with vendor helm charts (from in.Spec.Config.Extensions.Helm)
-func mergeHelmConfigs(ctx context.Context, meta *ectypes.ReleaseMetadata, in *clusterv1beta1.Installation, clusterConfig *k0sv1beta1.ClusterConfig) (*k0sv1beta1.HelmExtensions, error) {
+func mergeHelmConfigs(ctx context.Context, meta *ectypes.ReleaseMetadata, in *clusterv1beta1.Installation, clusterConfig *k0sv1beta1.ClusterConfig) (*v1beta1.Helm, error) {
 	// merge default helm charts (from meta.Configs) with vendor helm charts (from in.Spec.Config.Extensions.Helm)
-	combinedConfigs := &k0sv1beta1.HelmExtensions{ConcurrencyLevel: 1}
+	combinedConfigs := &v1beta1.Helm{ConcurrencyLevel: 1}
 	if meta != nil {
 		combinedConfigs.Charts = meta.Configs.Charts
 		combinedConfigs.Repositories = meta.Configs.Repositories
@@ -126,7 +126,7 @@ func mergeHelmConfigs(ctx context.Context, meta *ectypes.ReleaseMetadata, in *cl
 }
 
 // updateInfraChartsFromInstall updates the infrastructure charts with dynamic values from the installation spec
-func updateInfraChartsFromInstall(in *v1beta1.Installation, clusterConfig *k0sv1beta1.ClusterConfig, charts k0sv1beta1.ChartsSettings) (k0sv1beta1.ChartsSettings, error) {
+func updateInfraChartsFromInstall(in *v1beta1.Installation, clusterConfig *k0sv1beta1.ClusterConfig, charts []v1beta1.Chart) ([]v1beta1.Chart, error) {
 	for i, chart := range charts {
 		if chart.Name == "admin-console" {
 			// admin-console has "embeddedClusterID" and "isAirgap" as dynamic values
@@ -181,7 +181,7 @@ func updateInfraChartsFromInstall(in *v1beta1.Installation, clusterConfig *k0sv1
 			if !in.Spec.AirGap {
 				continue
 			}
-			
+
 			// handle the registry IP, which will always be present in airgap
 			serviceCIDR := util.ClusterServiceCIDR(*clusterConfig, in)
 			registryEndpoint, err := registry.GetRegistryServiceIP(serviceCIDR)
@@ -194,7 +194,7 @@ func updateInfraChartsFromInstall(in *v1beta1.Installation, clusterConfig *k0sv1
 				return nil, fmt.Errorf("set helm values docker-registry.service.clusterIP: %w", err)
 			}
 			charts[i].Values = newVals
-			
+
 			if !in.Spec.HighAvailability {
 				continue
 			}
@@ -234,12 +234,12 @@ func updateInfraChartsFromInstall(in *v1beta1.Installation, clusterConfig *k0sv1
 }
 
 // applyUserProvidedAddonOverrides applies user-provided overrides to the HelmExtensions spec.
-func applyUserProvidedAddonOverrides(in *clusterv1beta1.Installation, combinedConfigs *k0sv1beta1.HelmExtensions) (*k0sv1beta1.HelmExtensions, error) {
+func applyUserProvidedAddonOverrides(in *clusterv1beta1.Installation, combinedConfigs *v1beta1.Helm) (*v1beta1.Helm, error) {
 	if in == nil || in.Spec.Config == nil {
 		return combinedConfigs, nil
 	}
 	patchedConfigs := combinedConfigs.DeepCopy()
-	patchedConfigs.Charts = k0sv1beta1.ChartsSettings{}
+	patchedConfigs.Charts = []v1beta1.Chart{}
 	for _, chart := range combinedConfigs.Charts {
 		newValues, err := in.Spec.Config.ApplyEndUserAddOnOverrides(chart.Name, chart.Values)
 		if err != nil {
@@ -255,7 +255,7 @@ func applyUserProvidedAddonOverrides(in *clusterv1beta1.Installation, combinedCo
 // sure that all helm charts point to a chart stored on disk as a tgz file. These files are already
 // expected to be present on the disk and, during an upgrade, are laid down on disk by the artifact
 // copy job.
-func patchExtensionsForAirGap(config *k0sv1beta1.HelmExtensions) *k0sv1beta1.HelmExtensions {
+func patchExtensionsForAirGap(config *v1beta1.Helm) *v1beta1.Helm {
 	config.Repositories = nil
 	for idx, chart := range config.Charts {
 		chartName := fmt.Sprintf("%s-%s.tgz", chart.Name, chart.Version)

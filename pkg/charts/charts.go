@@ -178,10 +178,11 @@ func updateInfraChartsFromInstall(in *v1beta1.Installation, clusterConfig *k0sv1
 			charts[i].Values = newVals
 		}
 		if chart.Name == "docker-registry" {
-			if !in.Spec.AirGap || !in.Spec.HighAvailability {
+			if !in.Spec.AirGap {
 				continue
 			}
-
+			
+			// handle the registry IP, which will always be present in airgap
 			serviceCIDR := util.ClusterServiceCIDR(*clusterConfig, in)
 			registryEndpoint, err := registry.GetRegistryServiceIP(serviceCIDR)
 			if err != nil {
@@ -192,7 +193,13 @@ func updateInfraChartsFromInstall(in *v1beta1.Installation, clusterConfig *k0sv1
 			if err != nil {
 				return nil, fmt.Errorf("set helm values docker-registry.service.clusterIP: %w", err)
 			}
+			charts[i].Values = newVals
+			
+			if !in.Spec.HighAvailability {
+				continue
+			}
 
+			// handle the seaweedFS endpoint, which will only be present in HA airgap
 			seaweedfsS3Endpoint, err := registry.GetSeaweedfsS3Endpoint(serviceCIDR)
 			if err != nil {
 				return nil, fmt.Errorf("get seaweedfs s3 endpoint: %w", err)

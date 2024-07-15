@@ -3,7 +3,7 @@ module github.com/replicatedhq/embedded-cluster-operator
 go 1.22.0
 
 require (
-	github.com/aws/aws-sdk-go-v2 v1.30.1
+	github.com/aws/aws-sdk-go-v2 v1.30.3
 	github.com/aws/aws-sdk-go-v2/config v1.27.23
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.23
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.57.1
@@ -18,9 +18,9 @@ require (
 	github.com/ohler55/ojg v1.22.1
 	github.com/onsi/ginkgo/v2 v2.19.0
 	github.com/onsi/gomega v1.33.1
+	github.com/replicatedhq/embedded-cluster-kinds v1.4.5
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.8.1
-	github.com/replicatedhq/embedded-cluster-kinds v1.4.5
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/multierr v1.11.0
 	gopkg.in/yaml.v2 v2.4.0

@@ -60,6 +60,7 @@ jobs:
           USERNAME=${{secrets.KOTS_HELM_USER_PROD}} \
           PASSWORD=${{secrets.KOTS_HELM_PASS_PROD}}
         make apko-publish
+        echo ::notice title=digest::$(cat build/digest)
 
   package-and-publish-helmchart:
     runs-on: 'ubuntu-20.04'

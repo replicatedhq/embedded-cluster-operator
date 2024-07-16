@@ -326,7 +326,7 @@ apko-publish: export ARCHS = amd64
 apko-publish: apko-template
 	docker run -v "${PWD}":/work -w /work/build -v "${PWD}"/build/.docker:/root/.docker \
 		cgr.dev/chainguard/apko publish apko.yaml ${IMAGE} \
-			--arch ${ARCHS}
+			--arch ${ARCHS} | tee build/digest
 
 .PHONY: apko-login
 apko-login: check-env-REGISTRY check-env-USERNAME check-env-PASSWORD

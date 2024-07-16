@@ -38,12 +38,6 @@ jobs:
     - name: Build
       run: |
         make build VERSION=dev-${{ env.SHORT_SHA }}
-    # - name: Docker Image
-    #   uses: docker/build-push-action@v6
-    #   with:
-    #     push: true
-    #     tags: |
-    #       ttl.sh/embedded-cluster-operator-image:dev-${{ env.SHORT_SHA }}
     - name: Prepare image build
       run: |
         export VERSION=$(git describe --tags --dirty)
@@ -51,17 +45,18 @@ jobs:
         make apko-template
         cp bin/manager manager
     - name: Build melange package
-      uses: ./.github/actions/build-custom-melange-package
+      uses: chainguard-dev/actions/melange-build@main
       with:
-        component: embedded-cluster-operator
         config: deploy/melange.yaml
         archs: amd64
+        sign-with-temporary-key: true
     - name: Build apko image
-      uses: ./.github/actions/build-custom-image-with-apko
+      uses: chainguard-images/actions/apko-publish@main
       with:
-        component: embedded-cluster-operator
         config: deploy/apko.yaml
         archs: amd64
+        tag: ttl.sh/embedded-cluster-operator-image:dev-${{ env.SHORT_SHA }}
+        vcs-url: true
 
   check-crds:
     name: Check CRDs

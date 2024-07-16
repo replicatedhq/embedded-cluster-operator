@@ -297,9 +297,11 @@ catalog-push: ## Push a catalog image.
 
 # Push operator image to ttl.sh
 .PHONY: build-ttl.sh
-build-ttl.sh:
-	docker build --platform linux/amd64 -t ttl.sh/${CURRENT_USER}/embedded-cluster-operator-image:24h .
-	docker push ttl.sh/${CURRENT_USER}/embedded-cluster-operator-image:24h
+build-ttl.sh: export IMAGE = ttl.sh/${CURRENT_USER}/embedded-cluster-operator-image:24h
+build-ttl.sh: export VERSION = $(shell git describe --tags --dirty --always --abbrev=8 | sed 's/^v//')
+build-ttl.sh: export GOOS = linux
+build-ttl.sh: export GOARCH = amd64
+build-ttl.sh: melange apko-publish
 
 .PHONY: build-chart-ttl.sh
 build-chart-ttl.sh: build-ttl.sh
@@ -310,19 +312,49 @@ build-chart-ttl.sh: export CHART_REMOTE = oci://ttl.sh/${CURRENT_USER}
 build-chart-ttl.sh:
 	cd charts/embedded-cluster-operator && ../../scripts/publish-helm-chart.sh
 
-.PHONY: melange-alpha
-melange-alpha: export VERSION = $(shell git describe --tags --dirty)
-melange-alpha: export GOOS = linux
-melange-alpha: export GOARCH = amd64
-melange-alpha: melange-template build
+.PHONY: apko-build
+apko-build: export IMAGE = ttl.sh/${CURRENT_USER}/embedded-cluster-operator-image:24h
+apko-build: export ARCHS = amd64
+apko-build: apko-template
+	docker run -v "${PWD}":/work -w /work/deploy \
+		cgr.dev/chainguard/apko build apko.yaml ${IMAGE} apko.tar \
+			--arch ${ARCHS}
+
+.PHONY: apko-publish
+apko-publish: export IMAGE = ttl.sh/${CURRENT_USER}/embedded-cluster-operator-image:24h
+apko-publish: export ARCHS = amd64
+apko-publish: apko-template
+	docker run -v "${PWD}":/work -w /work/deploy -v "${PWD}"/deploy/.docker:/root/.docker \
+		cgr.dev/chainguard/apko publish apko.yaml ${IMAGE} \
+			--arch ${ARCHS}
+
+.PHONY: apko-login
+apko-login: check-env-REGISTRY check-env-USERNAME check-env-PASSWORD
+	docker run -v "${PWD}":/work -v "${PWD}"/deploy/.docker:/root/.docker -w /work/deploy \
+		cgr.dev/chainguard/apko login -u "${USERNAME}" \
+			--password "${PASSWORD}" "${REGISTRY}"
+
+.PHONY: melange
+melange: export ARCHS = amd64
+melange: melange-template build
 	cp bin/manager deploy/manager
-	docker run --privileged --rm -v "${PWD}":/work \
-		cgr.dev/chainguard/melange build deploy/melange.yaml --arch amd64
+	docker run --rm -v "${PWD}":/work -w /work/deploy \
+		cgr.dev/chainguard/melange keygen melange.rsa
+	docker run --privileged --rm -v "${PWD}":/work -w /work/deploy \
+		cgr.dev/chainguard/melange build melange.yaml \
+			--arch ${ARCHS} \
+			--signing-key melange.rsa
 
 .PHONY: melange-template
-melange-template:
-	envsubst '$${VERSION}' < deploy/melange.dev.tmpl.yaml > deploy/melange.yaml
+melange-template: check-env-VERSION
+	envsubst '$${VERSION}' < deploy/melange.tmpl.yaml > deploy/melange.yaml
 
 .PHONY: apko-template
-apko-template:
+apko-template: check-env-VERSION
 	envsubst '$${VERSION}' < deploy/apko.tmpl.yaml > deploy/apko.yaml
+
+check-env-%:
+	@ if [ "${${*}}" = "" ]; then \
+		echo "Environment variable $* not set"; \
+		exit 1; \
+	fi

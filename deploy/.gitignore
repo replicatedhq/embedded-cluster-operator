@@ -1,2 +1,8 @@
 manager
 melange.yaml
+melange.rsa*
+packages
+apko.yaml
+apko.tar
+sbom*
+.docker

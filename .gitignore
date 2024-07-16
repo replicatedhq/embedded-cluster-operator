@@ -23,5 +23,3 @@ go.work
 bin/
 
 *.tgz
-/packages/
-melange.yaml

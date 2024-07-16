@@ -37,32 +37,17 @@ jobs:
         go-version-file: go.mod
     - name: Build
       run: |
-        export VERSION=$(git describe --tags --dirty)
+        export VERSION=$(git describe --tags --dirty --always --abbrev=8 | sed 's/^v//')
         make build
-    - name: Prepare image build
-      run: |
-        export VERSION=$(git describe --tags --dirty)
-        make melange-template
-        make apko-template
-        cp bin/manager manager
     - name: Build melange package
-      uses: chainguard-dev/actions/melange-build@main
-      with:
-        config: deploy/melange.yaml
-        archs: amd64
-        sign-with-temporary-key: true
-    - name: Build apko image
-      id: build-apko-image
-      uses: chainguard-images/actions/apko-publish@main
-      with:
-        config: deploy/apko.yaml
-        archs: amd64
-        tag: ttl.sh/embedded-cluster-operator-image:dev-${{ env.SHORT_SHA }}
-        vcs-url: true
-    - name: Output notices
       run: |
-        echo "::notice title=image::ttl.sh/embedded-cluster-operator-image:dev-${{ env.SHORT_SHA }}"
-        echo "::notice title=image digest::${{ steps.build-apko-image.outputs.digest }}"
+        export VERSION=$(git describe --tags --dirty --always --abbrev=8 | sed 's/^v//')
+        make melange
+    - name: Build apko image
+      run: |
+        export VERSION=$(git describe --tags --dirty --always --abbrev=8 | sed 's/^v//')
+        export IMAGE=ttl.sh/embedded-cluster-operator-image:dev-${VERSION}
+        make apko-build
 
   check-crds:
     name: Check CRDs

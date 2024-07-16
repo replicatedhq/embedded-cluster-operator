@@ -312,7 +312,7 @@ build-chart-ttl.sh:
 
 .PHONY: melange-template
 melange-template:
-	envsubst '${VERSION}' < deploy/melange.dev.tmpl.yaml > deploy/melange.yaml
+	envsubst '$${VERSION}' < deploy/melange.dev.tmpl.yaml > deploy/melange.yaml
 
 .PHONY: melange-alpha
 melange-alpha: export VERSION = $(shell git describe --tags --dirty)

@@ -44,17 +44,24 @@ jobs:
     #     push: true
     #     tags: |
     #       ttl.sh/embedded-cluster-operator-image:dev-${{ env.SHORT_SHA }}
-    - name: Prepare melange build
+    - name: Prepare image build
       run: |
         export VERSION=$(git describe --tags --dirty)
         make melange-template
+        make apko-template
         cp bin/manager manager
     - name: Build melange package
-      uses: chainguard-dev/actions/melange-build@main
+      uses: ./.github/actions/build-custom-melange-package
       with:
+        component: embedded-cluster-operator
         config: deploy/melange.yaml
         archs: amd64
-        sign-with-temporary-key: true
+    - name: Build apko image
+      uses: ./.github/actions/build-custom-image-with-apko
+      with:
+        component: embedded-cluster-operator
+        config: deploy/apko.yaml
+        archs: amd64
 
   check-crds:
     name: Check CRDs

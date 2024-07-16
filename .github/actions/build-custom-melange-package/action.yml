@@ -1,0 +1,38 @@
+name: 'Build a custom melange package'
+description: 'Composite action for building a custom melange package'
+inputs:
+  component:
+    description: 'Name of the component'
+    required: true
+
+  config:
+    description: 'Path to the melanage config file'
+    required: true
+
+  archs:
+    description: 'Architectures to build for'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+
+    - uses: chainguard-dev/actions/melange-build@main
+      with:
+        config: ${{ inputs.config }}
+        archs: ${{ inputs.archs }}
+        sign-with-temporary-key: true
+
+    - name: rename melange.rsa.pub
+      shell: bash
+      run: mv melange.rsa.pub melange.rsa.pub
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.component }}-melange-packages
+        path: ./packages
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.component }}-melange-rsa-pub
+        path: ./melange.rsa.pub

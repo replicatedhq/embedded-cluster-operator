@@ -310,10 +310,6 @@ build-chart-ttl.sh: export CHART_REMOTE = oci://ttl.sh/${CURRENT_USER}
 build-chart-ttl.sh:
 	cd charts/embedded-cluster-operator && ../../scripts/publish-helm-chart.sh
 
-.PHONY: melange-template
-melange-template:
-	envsubst '$${VERSION}' < deploy/melange.dev.tmpl.yaml > deploy/melange.yaml
-
 .PHONY: melange-alpha
 melange-alpha: export VERSION = $(shell git describe --tags --dirty)
 melange-alpha: export GOOS = linux
@@ -322,3 +318,11 @@ melange-alpha: melange-template build
 	cp bin/manager deploy/manager
 	docker run --privileged --rm -v "${PWD}":/work \
 		cgr.dev/chainguard/melange build deploy/melange.yaml --arch amd64
+
+.PHONY: melange-template
+melange-template:
+	envsubst '$${VERSION}' < deploy/melange.dev.tmpl.yaml > deploy/melange.yaml
+
+.PHONY: apko-template
+apko-template:
+	envsubst '$${VERSION}' < deploy/apko.tmpl.yaml > deploy/apko.yaml

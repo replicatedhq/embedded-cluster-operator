@@ -24,6 +24,10 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: go.mod
     - name: Build melange package
       run: |
         export VERSION=${{needs.get-tag.outputs.tag}}
@@ -73,7 +77,6 @@ jobs:
           mkdir -p bin
           crane export --platform linux/amd64 docker.io/replicated/embedded-cluster-operator-image:${{needs.get-tag.outputs.tag}} \
             | tar -Oxf - manager > bin/manager
-          chmod +x migrations/schemahero
       - name: Release
         uses: softprops/action-gh-release@v2
         with:

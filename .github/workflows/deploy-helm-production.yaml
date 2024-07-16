@@ -14,9 +14,9 @@ jobs:
     steps:
     - name: Get tag
       id: tag
-      uses: dawidd6/action-get-tag@v1
-      with:
-        strip_v: true
+      run: |
+        TAG=${{ github.ref_name }}
+        run: echo "tag=${TAG#v}" >> "$GITHUB_OUTPUT"
 
   package-and-publish-operator:
     runs-on: ubuntu-latest

@@ -114,7 +114,10 @@ test: manifests fmt vet envtest ## Run tests.
 
 .PHONY: build
 build: ## Build manager binary.
-	CGO_ENABLED=0 go build -o bin/manager main.go
+	go build \
+		-tags osusergo,netgo \
+		-ldflags="-s -w -extldflags=-static" \
+		-o bin/manager main.go
 
 .PHONY: run
 run: manifests fmt vet ## Run a controller from your host.

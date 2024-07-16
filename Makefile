@@ -113,10 +113,8 @@ test: manifests fmt vet envtest ## Run tests.
 ##@ Build
 
 .PHONY: build
-build: GOOS = linux
-build: GOARCH = amd64
-build: manifests fmt vet ## Build manager binary.
-	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o bin/manager main.go
+build: fmt vet ## Build manager binary.
+	CGO_ENABLED=0 go build -o bin/manager main.go
 
 .PHONY: run
 run: manifests fmt vet ## Run a controller from your host.
@@ -311,3 +309,16 @@ build-chart-ttl.sh: export OPERATOR_IMAGE_TAG = 24h
 build-chart-ttl.sh: export CHART_REMOTE = oci://ttl.sh/${CURRENT_USER}
 build-chart-ttl.sh:
 	cd charts/embedded-cluster-operator && ../../scripts/publish-helm-chart.sh
+
+.PHONY: melange-template
+melange-template:
+	envsubst '${VERSION}' < deploy/melange.dev.tmpl.yaml > deploy/melange.yaml
+
+.PHONY: melange-alpha
+melange-alpha: export VERSION = $(shell git describe --tags --dirty)
+melange-alpha: export GOOS = linux
+melange-alpha: export GOARCH = amd64
+melange-alpha: melange-template build
+	cp bin/manager deploy/manager
+	docker run --privileged --rm -v "${PWD}":/work \
+		cgr.dev/chainguard/melange build deploy/melange.yaml --arch amd64

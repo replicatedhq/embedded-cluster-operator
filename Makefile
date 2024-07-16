@@ -338,13 +338,15 @@ apko-login: check-env-REGISTRY check-env-USERNAME check-env-PASSWORD
 melange: export ARCHS = amd64
 melange: melange-template
 	mkdir -p build
-	cp bin/manager build/manager
+	for f in pkg controllers main.go go.mod go.sum Makefile ; do \
+		rm -rf "build/$$f" && cp -r $$f build/ ; \
+	done
 	docker run --rm -v "${PWD}":/work -w /work/build \
 		cgr.dev/chainguard/melange keygen melange.rsa
-	docker run --privileged --rm -v "${PWD}":/work -w /work/build \
-		cgr.dev/chainguard/melange build melange.yaml \
+	docker run --privileged --rm -v "${PWD}":/work -w /work \
+		cgr.dev/chainguard/melange build build/melange.yaml \
 			--arch ${ARCHS} \
-			--signing-key melange.rsa
+			--signing-key build/melange.rsa
 
 .PHONY: melange-template
 melange-template: check-env-VERSION

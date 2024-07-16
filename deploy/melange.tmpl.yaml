@@ -14,8 +14,10 @@ environment:
       - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
     packages:
       - busybox
+      - go
 
 pipeline:
   - runs: |
       set -ex
-      cp manager "${{targets.destdir}}/manager"
+      make build
+      cp bin/manager "${{targets.destdir}}/manager"

@@ -31,11 +31,11 @@ jobs:
     - name: Publish apko image
       run: |
         export VERSION=${{needs.get-tag.outputs.tag}}
-        export IMAGE=registry.staging.replicated.com/library/embedded-cluster-operator-image:${VERSION}
+        export IMAGE=replicated/embedded-cluster-operator-image-staging:${VERSION}
         make apko-login \
-          REGISTRY=registry.staging.replicated.com \
-          USERNAME=${{secrets.KOTS_HELM_USER_STAGING}} \
-          PASSWORD=${{secrets.KOTS_HELM_PASS_STAGING}}
+          REGISTRY=docker.io \
+          USERNAME=${{secrets.DOCKERHUB_USER}} \
+          PASSWORD=${{secrets.DOCKERHUB_PASSWORD}}
         make apko-publish
         echo ::notice title=digest::$(cat build/digest)
 
@@ -57,7 +57,7 @@ jobs:
         HELM_REGISTRY: registry.staging.replicated.com
         CHART_VERSION: ${{needs.get-tag.outputs.tag}}
       run: |
-        export OPERATOR_IMAGE_NAME=registry.staging.replicated.com/library/embedded-cluster-operator-image
+        export OPERATOR_IMAGE_NAME=replicated/embedded-cluster-operator-image-staging
         export OPERATOR_IMAGE_TAG=${CHART_VERSION}
         export CHART_REMOTE=oci://registry.staging.replicated.com/library
 

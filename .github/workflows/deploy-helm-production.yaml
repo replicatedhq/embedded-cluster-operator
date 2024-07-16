@@ -31,11 +31,11 @@ jobs:
     - name: Publish apko image
       run: |
         export VERSION=${{needs.get-tag.outputs.tag}}
-        export IMAGE=registry.replicated.com/library/embedded-cluster-operator-image:${VERSION}
+        export IMAGE=replicated/embedded-cluster-operator-image:${VERSION}
         make apko-login \
-          REGISTRY=registry.replicated.com \
-          USERNAME=${{secrets.KOTS_HELM_USER_PROD}} \
-          PASSWORD=${{secrets.KOTS_HELM_PASS_PROD}}
+          REGISTRY=docker.io \
+          USERNAME=${{secrets.DOCKERHUB_USER}} \
+          PASSWORD=${{secrets.DOCKERHUB_PASSWORD}}
         make apko-publish
         echo ::notice title=digest::$(cat build/digest)
 
@@ -57,7 +57,7 @@ jobs:
         HELM_REGISTRY: registry.replicated.com
         CHART_VERSION: ${{needs.get-tag.outputs.tag}}
       run: |
-        export OPERATOR_IMAGE_NAME=registry.replicated.com/library/embedded-cluster-operator-image
+        export OPERATOR_IMAGE_NAME=replicated/embedded-cluster-operator-image
         export OPERATOR_IMAGE_TAG=${CHART_VERSION}
         export CHART_REMOTE=oci://registry.replicated.com/library
 
@@ -71,7 +71,7 @@ jobs:
       - name: Download artifact
         run: |
           mkdir -p bin
-          crane export --platform linux/amd64 registry.replicated.com/library/embedded-cluster-operator-image:${{needs.get-tag.outputs.tag}} \
+          crane export --platform linux/amd64 docker.io/replicated/embedded-cluster-operator-image:${{needs.get-tag.outputs.tag}} \
             | tar -Oxf - manager > bin/manager
           chmod +x migrations/schemahero
       - name: Release

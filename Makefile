@@ -316,7 +316,7 @@ build-chart-ttl.sh:
 apko-build: export IMAGE = ttl.sh/${CURRENT_USER}/embedded-cluster-operator-image:24h
 apko-build: export ARCHS = amd64
 apko-build: apko-template
-	docker run -v "${PWD}":/work -w /work/deploy \
+	docker run -v "${PWD}":/work -w /work/build \
 		cgr.dev/chainguard/apko build apko.yaml ${IMAGE} apko.tar \
 			--arch ${ARCHS}
 
@@ -324,34 +324,37 @@ apko-build: apko-template
 apko-publish: export IMAGE = ttl.sh/${CURRENT_USER}/embedded-cluster-operator-image:24h
 apko-publish: export ARCHS = amd64
 apko-publish: apko-template
-	docker run -v "${PWD}":/work -w /work/deploy -v "${PWD}"/deploy/.docker:/root/.docker \
+	docker run -v "${PWD}":/work -w /work/build -v "${PWD}"/build/.docker:/root/.docker \
 		cgr.dev/chainguard/apko publish apko.yaml ${IMAGE} \
 			--arch ${ARCHS}
 
 .PHONY: apko-login
 apko-login: check-env-REGISTRY check-env-USERNAME check-env-PASSWORD
-	docker run -v "${PWD}":/work -v "${PWD}"/deploy/.docker:/root/.docker -w /work/deploy \
+	docker run -v "${PWD}":/work -v "${PWD}"/build/.docker:/root/.docker -w /work/build \
 		cgr.dev/chainguard/apko login -u "${USERNAME}" \
 			--password "${PASSWORD}" "${REGISTRY}"
 
 .PHONY: melange
 melange: export ARCHS = amd64
 melange: melange-template
-	cp bin/manager deploy/manager
-	docker run --rm -v "${PWD}":/work -w /work/deploy \
+	mkdir -p build
+	cp bin/manager build/manager
+	docker run --rm -v "${PWD}":/work -w /work/build \
 		cgr.dev/chainguard/melange keygen melange.rsa
-	docker run --privileged --rm -v "${PWD}":/work -w /work/deploy \
+	docker run --privileged --rm -v "${PWD}":/work -w /work/build \
 		cgr.dev/chainguard/melange build melange.yaml \
 			--arch ${ARCHS} \
 			--signing-key melange.rsa
 
 .PHONY: melange-template
 melange-template: check-env-VERSION
-	envsubst '$${VERSION}' < deploy/melange.tmpl.yaml > deploy/melange.yaml
+	mkdir -p build
+	envsubst '$${VERSION}' < deploy/melange.tmpl.yaml > build/melange.yaml
 
 .PHONY: apko-template
 apko-template: check-env-VERSION
-	envsubst '$${VERSION}' < deploy/apko.tmpl.yaml > deploy/apko.yaml
+	mkdir -p build
+	envsubst '$${VERSION}' < deploy/apko.tmpl.yaml > build/apko.yaml
 
 check-env-%:
 	@ if [ "${${*}}" = "" ]; then \

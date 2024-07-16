@@ -301,7 +301,7 @@ build-ttl.sh: export IMAGE = ttl.sh/${CURRENT_USER}/embedded-cluster-operator-im
 build-ttl.sh: export VERSION = $(shell git describe --tags --dirty --always --abbrev=8 | sed 's/^v//')
 build-ttl.sh: export GOOS = linux
 build-ttl.sh: export GOARCH = amd64
-build-ttl.sh: melange apko-publish
+build-ttl.sh: build melange apko-publish
 
 .PHONY: build-chart-ttl.sh
 build-chart-ttl.sh: build-ttl.sh
@@ -336,7 +336,7 @@ apko-login: check-env-REGISTRY check-env-USERNAME check-env-PASSWORD
 
 .PHONY: melange
 melange: export ARCHS = amd64
-melange: melange-template build
+melange: melange-template
 	cp bin/manager deploy/manager
 	docker run --rm -v "${PWD}":/work -w /work/deploy \
 		cgr.dev/chainguard/melange keygen melange.rsa

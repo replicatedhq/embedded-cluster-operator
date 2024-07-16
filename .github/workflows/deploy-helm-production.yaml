@@ -6,7 +6,8 @@ on:
     - 'v[0-9]+.[0-9]+.[0-9]+\-build\.[0-9]+'
 
 jobs:
-  package-and-publish-operator:
+
+  build:
     runs-on: ubuntu-latest
     steps:
     - name: Get tag
@@ -20,21 +21,49 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version-file: go.mod
-    - name: Login to registry
-      uses: docker/login-action@v3
+    - name: Build
+      run: |
+        export VERSION=${{steps.tag.outputs.tag}}
+        make build
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
       with:
-        registry: registry.replicated.com
-        username: ${{secrets.KOTS_HELM_USER_PROD}}
-        password: ${{secrets.KOTS_HELM_PASS_PROD}}
-    - name: Docker Image
-      uses: docker/build-push-action@v6
+        name: manager
+        path: ./bin/manager
+
+  package-and-publish-operator:
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+    - name: Download artifact
+      uses: actions/download-artifact@v4
       with:
-        push: true
-        tags: |
-          registry.replicated.com/library/embedded-cluster-operator-image:${{steps.tag.outputs.tag}}
+        name: manager
+        path: ./bin/manager
+    - name: Get tag
+      id: tag
+      uses: dawidd6/action-get-tag@v1
+      with:
+        strip_v: true
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Build melange package
+      run: |
+        export VERSION=${{steps.tag.outputs.tag}}
+        make melange
+    - name: Publish apko image
+      run: |
+        export VERSION=${{steps.tag.outputs.tag}}
+        export IMAGE=registry.replicated.com/library/embedded-cluster-operator-image:${VERSION}
+        make apko-login \
+          REGISTRY=registry.replicated.com \
+          USERNAME=${{secrets.KOTS_HELM_USER_PROD}} \
+          PASSWORD=${{secrets.KOTS_HELM_PASS_PROD}}
+        make apko-publish
+
   package-and-publish-helmchart:
     runs-on: 'ubuntu-20.04'
-    needs: package-and-publish-operator
+    needs: [package-and-publish-operator]
     steps:
     - name: Get tag
       id: tag
@@ -63,18 +92,13 @@ jobs:
 
   releaser:
     runs-on: ubuntu-latest
+    needs: [build, package-and-publish-helmchart]
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Download artifact
+        uses: actions/download-artifact@v4
         with:
-          fetch-depth: 0
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-      - name: Build linux-amd64
-        run: |
-          make build
+          name: manager
+          path: ./bin/manager
       - name: Release
         uses: softprops/action-gh-release@v2
         with:

@@ -16,7 +16,7 @@ jobs:
       id: tag
       run: |
         TAG=${{ github.ref_name }}
-        run: echo "tag=${TAG#v}" >> "$GITHUB_OUTPUT"
+        echo "tag=${TAG#v}" >> "$GITHUB_OUTPUT"
 
   package-and-publish-operator:
     runs-on: ubuntu-latest

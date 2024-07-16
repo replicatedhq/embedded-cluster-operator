@@ -23,10 +23,6 @@ runs:
         archs: ${{ inputs.archs }}
         sign-with-temporary-key: true
 
-    - name: rename melange.rsa.pub
-      shell: bash
-      run: mv melange.rsa.pub melange.rsa.pub
-
     - uses: actions/upload-artifact@v4
       with:
         name: ${{ inputs.component }}-melange-packages

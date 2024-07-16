@@ -38,17 +38,17 @@ jobs:
     - name: Build
       run: |
         make build VERSION=dev-${{ env.SHORT_SHA }}
-    - name: Docker Image
-      uses: docker/build-push-action@v6
-      with:
-        push: true
-        tags: |
-          ttl.sh/embedded-cluster-operator-image:dev-${{ env.SHORT_SHA }}
+    # - name: Docker Image
+    #   uses: docker/build-push-action@v6
+    #   with:
+    #     push: true
+    #     tags: |
+    #       ttl.sh/embedded-cluster-operator-image:dev-${{ env.SHORT_SHA }}
     - name: Prepare melange build
       run: |
         export VERSION=$(git describe --tags --dirty)
         make melange-template
-        cp bin/manager deploy/manager
+        cp bin/manager manager
     - name: Build melange package
       uses: chainguard-dev/actions/melange-build@main
       with:
@@ -66,10 +66,10 @@ jobs:
       run: make manifests
     - name: Check CRDs
       run: |
-          git diff --exit-code --name-only
-          if [ $? -eq 0 ]; then
-            echo "CRDs are up to date"
-          else
-            echo "CRDs are out of date"
-            exit 1
-          fi
+        git diff --exit-code --name-only
+        if [ $? -eq 0 ]; then
+          echo "CRDs are up to date"
+        else
+          echo "CRDs are out of date"
+          exit 1
+        fi

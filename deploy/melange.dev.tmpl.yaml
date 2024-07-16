@@ -18,4 +18,6 @@ environment:
 pipeline:
   - runs: |
       set -ex
+      ls
+      pwd
       cp manager "${{targets.destdir}}/manager"

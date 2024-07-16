@@ -15,6 +15,8 @@ environment:
     packages:
       - busybox
       - go
+  environment:
+    GOMODCACHE: /var/cache/melange
 
 pipeline:
   - runs: |

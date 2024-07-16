@@ -313,16 +313,16 @@ build-chart-ttl.sh:
 	cd charts/embedded-cluster-operator && ../../scripts/publish-helm-chart.sh
 
 .PHONY: apko-build
-apko-build: export IMAGE = ttl.sh/${CURRENT_USER}/embedded-cluster-operator-image:24h
-apko-build: export ARCHS = amd64
+apko-build: export IMAGE ?= ttl.sh/${CURRENT_USER}/embedded-cluster-operator-image:24h
+apko-build: export ARCHS ?= amd64
 apko-build: apko-template
 	docker run -v "${PWD}":/work -w /work/build \
 		cgr.dev/chainguard/apko build apko.yaml ${IMAGE} apko.tar \
 			--arch ${ARCHS}
 
 .PHONY: apko-publish
-apko-publish: export IMAGE = ttl.sh/${CURRENT_USER}/embedded-cluster-operator-image:24h
-apko-publish: export ARCHS = amd64
+apko-publish: export IMAGE ?= ttl.sh/${CURRENT_USER}/embedded-cluster-operator-image:24h
+apko-publish: export ARCHS ?= amd64
 apko-publish: apko-template
 	docker run -v "${PWD}":/work -w /work/build -v "${PWD}"/build/.docker:/root/.docker \
 		cgr.dev/chainguard/apko publish apko.yaml ${IMAGE} \
@@ -335,7 +335,7 @@ apko-login: check-env-REGISTRY check-env-USERNAME check-env-PASSWORD
 			--password "${PASSWORD}" "${REGISTRY}"
 
 .PHONY: melange
-melange: export ARCHS = amd64
+melange: export ARCHS ?= amd64
 melange: melange-template
 	mkdir -p build
 	for f in pkg controllers main.go go.mod go.sum Makefile ; do \
@@ -344,9 +344,12 @@ melange: melange-template
 	docker run --rm -v "${PWD}":/work -w /work/build \
 		cgr.dev/chainguard/melange keygen melange.rsa
 	docker run --privileged --rm -v "${PWD}":/work -w /work \
+		-v "$(shell go env GOMODCACHE)":/go/pkg/mod \
 		cgr.dev/chainguard/melange build build/melange.yaml \
 			--arch ${ARCHS} \
-			--signing-key build/melange.rsa
+			--signing-key build/melange.rsa \
+			--cache-dir=/go/pkg/mod \
+			--out-dir build/packages/
 
 .PHONY: melange-template
 melange-template: check-env-VERSION

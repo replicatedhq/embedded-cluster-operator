@@ -35,18 +35,18 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build]
     steps:
-    - name: Download artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: manager
-        path: ./bin/manager
+    - name: Checkout
+      uses: actions/checkout@v4
     - name: Get tag
       id: tag
       uses: dawidd6/action-get-tag@v1
       with:
         strip_v: true
-    - name: Checkout
-      uses: actions/checkout@v4
+    - name: Download artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: manager
+        path: bin/
     - name: Build melange package
       run: |
         export VERSION=${{steps.tag.outputs.tag}}
@@ -98,7 +98,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: manager
-          path: ./bin/manager
+          path: bin/
       - name: Release
         uses: softprops/action-gh-release@v2
         with:

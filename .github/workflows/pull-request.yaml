@@ -37,7 +37,8 @@ jobs:
         go-version-file: go.mod
     - name: Build
       run: |
-        make build VERSION=dev-${{ env.SHORT_SHA }}
+        export VERSION=$(git describe --tags --dirty)
+        make build
     - name: Prepare image build
       run: |
         export VERSION=$(git describe --tags --dirty)
@@ -51,12 +52,17 @@ jobs:
         archs: amd64
         sign-with-temporary-key: true
     - name: Build apko image
+      id: build-apko-image
       uses: chainguard-images/actions/apko-publish@main
       with:
         config: deploy/apko.yaml
         archs: amd64
         tag: ttl.sh/embedded-cluster-operator-image:dev-${{ env.SHORT_SHA }}
         vcs-url: true
+    - name: Output notices
+      run: |
+        echo "::notice title=image::ttl.sh/embedded-cluster-operator-image:dev-${{ env.SHORT_SHA }}"
+        echo "::notice title=image digest::${{ steps.build-apko-image.outputs.digest }}"
 
   check-crds:
     name: Check CRDs

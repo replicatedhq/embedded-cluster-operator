@@ -113,7 +113,7 @@ test: manifests fmt vet envtest ## Run tests.
 ##@ Build
 
 .PHONY: build
-build: fmt vet ## Build manager binary.
+build: ## Build manager binary.
 	CGO_ENABLED=0 go build -o bin/manager main.go
 
 .PHONY: run

@@ -20,7 +20,8 @@ environment:
 
 pipeline:
   - runs: |
-      set -ex
+      set -exuo pipefail
+
       make build
       cp bin/manager "${{targets.destdir}}/manager"
   - uses: strip

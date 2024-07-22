@@ -69,7 +69,7 @@ func TestEnsureResources(t *testing.T) {
 				},
 			},
 			assertIn: func(t *testing.T, in *clusterv1beta1.Installation) {
-				if !assert.Len(t, in.Status.Conditions, 3) {
+				if !assert.Len(t, in.Status.Conditions, 2) {
 					return
 				}
 
@@ -86,12 +86,6 @@ func TestEnsureResources(t *testing.T) {
 				assert.Equal(t, "SecretReady", in.Status.Conditions[1].Reason)
 				assert.Equal(t, int64(2), in.Status.Conditions[1].ObservedGeneration)
 				assert.WithinDuration(t, metav1.Now().Time, in.Status.Conditions[1].LastTransitionTime.Time, time.Minute)
-
-				assert.Equal(t, seaweedfsS3ServiceReadyConditionType, in.Status.Conditions[2].Type)
-				assert.Equal(t, metav1.ConditionTrue, in.Status.Conditions[2].Status)
-				assert.Equal(t, "ServiceReady", in.Status.Conditions[2].Reason)
-				assert.Equal(t, int64(2), in.Status.Conditions[2].ObservedGeneration)
-				assert.WithinDuration(t, metav1.Now().Time, in.Status.Conditions[2].LastTransitionTime.Time, time.Minute)
 			},
 			assertRuntime: func(t *testing.T, cli client.Client) {
 				namespace := &corev1.Namespace{}
@@ -132,16 +126,6 @@ func TestEnsureResources(t *testing.T) {
 				if assert.Contains(t, secret.Data, "s3SecretKey") {
 					assert.Equal(t, "5U1QVkIxBhsQnmxRRHeqR1NqOLe4VEtX53Xc5vQt", string(secret.Data["s3SecretKey"]))
 				}
-
-				service := &corev1.Service{}
-				err = cli.Get(context.Background(), client.ObjectKey{Namespace: "seaweedfs", Name: "ec-seaweedfs-s3"}, service)
-				require.NoError(t, err)
-
-				if assert.Len(t, service.OwnerReferences, 1) {
-					assert.Equal(t, service.OwnerReferences[0].Name, "embedded-cluster-kinds")
-				}
-
-				assert.Equal(t, "10.96.0.12", service.Spec.ClusterIP)
 			},
 		},
 	}

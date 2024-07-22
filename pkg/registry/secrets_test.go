@@ -27,12 +27,8 @@ func Test_ensureSeaweedfsS3Secret(t *testing.T) {
 			name:   "create secret",
 			wantOp: controllerutil.OperationResultCreated,
 			assertRuntime: func(t *testing.T, cli client.Client) {
-				namespace := &corev1.Namespace{}
-				err := cli.Get(context.Background(), client.ObjectKey{Name: "seaweedfs"}, namespace)
-				require.NoError(t, err)
-
 				secret := &corev1.Secret{}
-				err = cli.Get(context.Background(), client.ObjectKey{Namespace: "seaweedfs", Name: "secret-seaweedfs-s3"}, secret)
+				err := cli.Get(context.Background(), client.ObjectKey{Namespace: "seaweedfs", Name: "secret-seaweedfs-s3"}, secret)
 				require.NoError(t, err)
 
 				if assert.Len(t, secret.OwnerReferences, 1) {

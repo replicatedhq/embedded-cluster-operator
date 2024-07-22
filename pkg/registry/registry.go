@@ -45,22 +45,6 @@ func EnsureResources(ctx context.Context, in *clusterv1beta1.Installation, cli c
 	}
 	in.Status.SetCondition(getRegistryS3SecretReadyCondition(in, metav1.ConditionTrue, "SecretReady", ""))
 
-	seaweedfsS3ServiceIP, err := getSeaweedfsS3ServiceIP(serviceCIDR)
-	if err != nil {
-		err = fmt.Errorf("get seaweedfs s3 service IP: %w", err)
-		in.Status.SetCondition(getSeaweedfsS3ServiceReadyCondition(in, metav1.ConditionFalse, "Failed", err.Error()))
-		return err
-	}
-
-	op, err = ensureSeaweedfsS3Service(ctx, in, cli, seaweedfsS3ServiceIP)
-	if err != nil {
-		in.Status.SetCondition(getSeaweedfsS3ServiceReadyCondition(in, metav1.ConditionFalse, "Failed", err.Error()))
-		return fmt.Errorf("ensure seaweedfs s3 service: %w", err)
-	} else if op != controllerutil.OperationResultNone {
-		log.Info("Seaweedfs s3 service changed", "operation", op)
-	}
-	in.Status.SetCondition(getSeaweedfsS3ServiceReadyCondition(in, metav1.ConditionTrue, "ServiceReady", ""))
-
 	return nil
 }
 

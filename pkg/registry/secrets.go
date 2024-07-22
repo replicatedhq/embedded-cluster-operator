@@ -36,18 +36,13 @@ func ensureSeaweedfsS3Secret(ctx context.Context, in *clusterv1beta1.Installatio
 
 	op := controllerutil.OperationResultNone
 
-	err := ensureSeaweedfsNamespace(ctx, cli)
-	if err != nil {
-		return nil, op, fmt.Errorf("ensure seaweedfs namespace: %w", err)
-	}
-
 	obj := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Name: seaweedfsS3SecretName, Namespace: seaweedfsNamespace},
 	}
 
 	var config seaweedfsConfig
 
-	op, err = ctrl.CreateOrUpdate(ctx, cli, obj, func() error {
+	op, err := ctrl.CreateOrUpdate(ctx, cli, obj, func() error {
 		err := ctrl.SetControllerReference(in, obj, cli.Scheme())
 		if err != nil {
 			return fmt.Errorf("set controller reference: %w", err)

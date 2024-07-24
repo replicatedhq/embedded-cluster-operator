@@ -422,18 +422,7 @@ func (r *InstallationReconciler) ReconcileRegistry(ctx context.Context, in *v1be
 		return fmt.Errorf("failed to get cluster config: %w", err)
 	}
 
-	serviceCIDR := util.ClusterServiceCIDR(clusterConfig, in)
-
-	err := registry.EnsureResources(ctx, in, r.Client, serviceCIDR)
-	if err != nil {
-		// Conditions may be updated so we need to update the status
-		if err := r.Status().Update(ctx, in); err != nil {
-			log.Error(err, "Failed to update installation status")
-		}
-		return fmt.Errorf("failed to ensure registry resources: %w", err)
-	}
-
-	err = registry.MigrateRegistryData(ctx, in, r.Client)
+	err := registry.MigrateRegistryData(ctx, in, r.Client)
 	if err != nil {
 		if err := r.Status().Update(ctx, in); err != nil {
 			log.Error(err, "Failed to update installation status")

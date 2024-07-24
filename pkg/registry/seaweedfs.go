@@ -6,10 +6,6 @@ import (
 )
 
 const (
-	// seaweedfsNamespace is the namespace where the Seaweedfs chart is installed.
-	// This namespace is defined in the chart in the release metadata.
-	seaweedfsNamespace = "seaweedfs"
-
 	// seaweedfsLowerBandIPIndex is the index of the seaweedfs service IP in the service CIDR.
 	// HACK: this is shared with the cli and operator as it is used by the registry to redirect requests for blobs.
 	seaweedfsLowerBandIPIndex = 11

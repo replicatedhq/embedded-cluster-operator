@@ -328,7 +328,7 @@ func ensureAirgapArtifactsInCluster(ctx context.Context, cli client.Client, in *
 		return fmt.Errorf("ensure autopilot plan: %w", err)
 	}
 
-	nsn := types.NamespacedName{Name: "autopilot"}
+	nsn := types.NamespacedName{Name: "autopilot-artifacts"}
 	plan := autopilotv1beta2.Plan{}
 
 	log.Info("Waiting for container images to be uploaded...")
@@ -396,7 +396,7 @@ func getAutopilotAirgapArtifactsPlan(ctx context.Context, cli client.Client, in 
 			Kind:       "Plan",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "autopilot",
+			Name: "autopilot-artifacts",
 			Annotations: map[string]string{
 				installationNameAnnotation: in.Name,
 			},

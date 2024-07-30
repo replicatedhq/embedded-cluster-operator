@@ -750,6 +750,13 @@ func (r *InstallationReconciler) StartAutopilotUpgrade(ctx context.Context, in *
 		meta.Versions["Kubernetes"],
 	)
 
+	if in.Spec.AirGap {
+		// if we are running in an airgap environment all assets are already present in the
+		// node and are served by the local-artifact-mirror binary listening on localhost
+		// port 50000. we just need to get autopilot to fetch the k0s binary from there.
+		k0surl = "http://127.0.0.1:50000/bin/k0s-upgrade"
+	}
+
 	plan := apv1b2.Plan{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "autopilot", // this is a fixed name and should not be changed

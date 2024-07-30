@@ -387,8 +387,10 @@ func (r *InstallationReconciler) ReconcileK0sVersion(ctx context.Context, in *v1
 	// of the plan id is deprecated in favour of the annotation.
 	annotation := plan.Annotations[InstallationNameAnnotation]
 	if annotation == in.Name || plan.Spec.ID == in.Name {
-		r.SetStateBasedOnPlan(in, plan)
-		return nil
+		if isAutopilotUpgradeToVersion(&plan, desiredVersion) {
+			r.SetStateBasedOnPlan(in, plan)
+			return nil
+		}
 	}
 
 	// this is most likely a plan that has been created by a previous installation
@@ -407,6 +409,15 @@ func (r *InstallationReconciler) ReconcileK0sVersion(ctx context.Context, in *v1
 		return fmt.Errorf("failed to delete previous upgrade plan: %w", err)
 	}
 	return nil
+}
+
+func isAutopilotUpgradeToVersion(plan *apv1b2.Plan, version string) bool {
+	for _, command := range plan.Spec.Commands {
+		if command.K0sUpdate != nil && command.K0sUpdate.Version == version {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *InstallationReconciler) ReconcileOpenebs(ctx context.Context, in *v1beta1.Installation) error {
@@ -741,7 +752,7 @@ func (r *InstallationReconciler) StartAutopilotUpgrade(ctx context.Context, in *
 
 	plan := apv1b2.Plan{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "autopilot",
+			Name: "autopilot", // this is a fixed name and should not be changed
 			Annotations: map[string]string{
 				InstallationNameAnnotation: in.Name,
 			},

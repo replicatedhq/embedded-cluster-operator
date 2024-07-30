@@ -399,7 +399,6 @@ func getAutopilotAirgapArtifactsPlan(ctx context.Context, cli client.Client, in 
 			Name: "autopilot", // this is a fixed name and should not be changed
 			Annotations: map[string]string{
 				installationNameAnnotation: in.Name,
-				autopilotTy
 			},
 		},
 		Spec: autopilotv1beta2.PlanSpec{

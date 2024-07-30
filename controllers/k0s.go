@@ -32,7 +32,7 @@ func (r *InstallationReconciler) shouldUpgradeK0s(ctx context.Context, in *clust
 		log.Info("K0s upgrade required", "desired", desiredServerVersion, "running", runningServerVersion)
 		return true, nil
 	} else if desiredServerVersion.LessThan(runningServerVersion) {
-		log.V(5).Info("K0s downgrade not supported", "desired", desiredServerVersion, "running", runningServerVersion)
+		log.Info("K0s downgrade not supported", "desired", desiredServerVersion, "running", runningServerVersion) // TODO log.V(5)
 		return false, nil
 	}
 
@@ -46,7 +46,7 @@ func (r *InstallationReconciler) shouldUpgradeK0s(ctx context.Context, in *clust
 		log.Info("K0s upgrade required", "desired", desiredK0sVersion, "previous", previousK0sVersion)
 		return true, nil
 	}
-	log.V(5).Info("K0s upgrade not required", "desired", desiredK0sVersion, "previous", previousK0sVersion)
+	log.Info("K0s upgrade not required", "desired", desiredK0sVersion, "previous", previousK0sVersion) // TODO log.V(5)
 	return false, nil
 }
 
